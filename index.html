@@ -98,21 +98,10 @@
           <div><button type="button" class="btn ghost sm" id="add-coauthor">+ Add a coauthor</button></div>
         </div>
 
-        <div class="grid2">
-          <div class="field">
-            <label for="f-jel">JEL codes</label>
-            <input id="f-jel" name="jel_codes" placeholder="e.g. F13, F14">
-          </div>
-          <div class="field">
-            <label for="f-kw">Keywords <span class="opt">(optional)</span></label>
-            <input id="f-kw" name="keywords">
-          </div>
-        </div>
-
         <div class="field">
-          <label for="f-abs">Abstract <span class="opt">(150 words max)</span></label>
-          <textarea id="f-abs" name="abstract" rows="6" required></textarea>
-          <span class="hint" id="abs-count">0 / 150 words</span>
+          <label for="f-abs">Abstract <span class="opt">(250 words max)</span></label>
+          <textarea id="f-abs" name="abstract" rows="8" required></textarea>
+          <span class="hint" id="abs-count">0 / 250 words</span>
         </div>
 
         <div class="field">
@@ -123,27 +112,7 @@
           </div>
         </div>
 
-        <div class="stack" style="gap:8px">
-          <span class="lbl">Participation</span>
-          <label class="check"><input type="checkbox" name="willing_discussant"> I'm willing to serve as a discussant for another paper</label>
-          <label class="check"><input type="checkbox" name="willing_chair"> I'm willing to chair a session</label>
-          <label class="check"><input type="checkbox" name="willing_review"> I'm willing to review 2–3 submissions in my area</label>
-        </div>
-
-        <div class="grid2">
-          <div class="field">
-            <label for="f-avail">Days I can attend</label>
-            <select id="f-avail" name="attendance">
-              <option>All three days</option>
-              <option>First two days only</option>
-              <option>Last two days only</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="f-coi">Conflicts of interest <span class="opt">(optional)</span></label>
-            <input id="f-coi" name="conflicts" placeholder="e.g. dissertation advisor">
-          </div>
-        </div>
+        <p class="muted small">Presenters are expected to attend all three days of the meetings.</p>
 
         <div id="form-msg" class="msg" hidden></div>
         <div class="btnrow">

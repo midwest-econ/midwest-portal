@@ -9,4 +9,4 @@ export const SUPABASE_KEY = 'sb_publishable_TLN2xy5eVmEqxJP386r77w_huBr6uKw';
 export const SITE = 'https://sites.google.com/view/midwesttradetheoryconference';
 
 export const MAX_PDF_MB = 20;
-export const MAX_ABSTRACT_WORDS = 150;
+export const MAX_ABSTRACT_WORDS = 250;

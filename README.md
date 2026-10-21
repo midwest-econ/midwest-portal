@@ -21,6 +21,7 @@ assets/style.css           styles matching the Google Site
 assets/banner.jpg          header photo
 supabase/migrations/       database setup, run in order in the Supabase SQL Editor
 supabase/email-templates/  sign-in emails, pasted into Supabase → Authentication → Emails
+supabase/functions/        Edge Functions (submission-email: author receipts, coauthor notices)
 ```
 
 ## Security rules
@@ -52,6 +53,7 @@ SQL Editor. Never edit a file that has already been run; add a new numbered one.
 | File | What it sets up |
 |---|---|
 | `001_submissions.sql` | meetings, organizers, submissions, the `papers` PDF bucket, access rules |
+| `002_emails_and_form_trim.sql` | tracks which coauthors were emailed; drops the removed form questions |
 
 ## Adding an organizer
 

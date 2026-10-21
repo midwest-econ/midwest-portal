@@ -33,11 +33,6 @@ function say(id, text, kind) {
 const fmtDate = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const fmtStamp = t => new Date(t).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 const wordCount = s => (s.trim().match(/\S+/g) || []).length;
-const weekday = (d, add) => {
-  const x = new Date(d + 'T12:00:00');
-  x.setDate(x.getDate() + add);
-  return x.toLocaleDateString('en-US', { weekday: 'short' });
-};
 
 function isOpen() {
   return meeting.submissions_open &&
@@ -65,14 +60,6 @@ async function loadMeeting() {
     const dd = document.createElement('dd'); dd.textContent = v;
     return [dt, dd];
   }));
-
-  if (meeting.starts_on) {
-    const s = meeting.starts_on;
-    const opts = [`All three days (${weekday(s, 0)}–${weekday(s, 2)})`,
-                  `${weekday(s, 0)} and ${weekday(s, 1)} only`,
-                  `${weekday(s, 1)} and ${weekday(s, 2)} only`];
-    $('f-avail').replaceChildren(...opts.map(o => new Option(o, o)));
-  }
 }
 
 // ---------------------------------------------------------------- sign-in
@@ -136,11 +123,9 @@ function fillForm() {
     updateCount();
     return;
   }
-  for (const k of ['title', 'presenter_name', 'presenter_affiliation', 'jel_codes',
-                   'keywords', 'abstract', 'attendance', 'conflicts']) {
+  for (const k of ['title', 'presenter_name', 'presenter_affiliation', 'abstract']) {
     if (f[k]) f[k].value = mine[k] || '';
   }
-  for (const k of ['willing_discussant', 'willing_chair', 'willing_review']) f[k].checked = mine[k];
   for (const r of f.program) r.checked = r.value === mine.program;
   (mine.coauthors || []).forEach(addCoauthor);
   updateCount();
@@ -222,14 +207,7 @@ $('paper-form').addEventListener('submit', async e => {
     presenter_affiliation: f.presenter_affiliation.value.trim(),
     presenter_email: user.email,
     coauthors: readCoauthors(),
-    jel_codes: f.jel_codes.value.trim() || null,
-    keywords: f.keywords.value.trim() || null,
     abstract: f.abstract.value.trim(),
-    willing_discussant: f.willing_discussant.checked,
-    willing_chair: f.willing_chair.checked,
-    willing_review: f.willing_review.checked,
-    attendance: f.attendance.value,
-    conflicts: f.conflicts.value.trim() || null,
   };
   if (newPath) row.pdf_path = newPath;
 
@@ -250,8 +228,13 @@ $('paper-form').addEventListener('submit', async e => {
   $('f-pdf').value = '';
   fillForm();
   say('form-msg', first
-    ? 'Thank you, your paper has been submitted. You can come back to edit it until the deadline.'
-    : 'Your changes have been saved.', 'ok');
+    ? `Thank you, your paper has been submitted. A confirmation is on its way to ${user.email}. You can come back to edit it until the deadline.`
+    : `Your changes have been saved. We've emailed an updated copy to ${user.email}.`, 'ok');
+
+  // Receipt + coauthor notices (supabase/functions/submission-email). The save
+  // already succeeded, so a failure here is only logged.
+  sb.functions.invoke('submission-email', { body: { id: mine.id } })
+    .then(({ error }) => { if (error) console.warn('Confirmation email failed:', error.message); });
 });
 
 // ---------------------------------------------------------------- render by state
