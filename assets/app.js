@@ -291,6 +291,8 @@ let current;
 sb.auth.onAuthStateChange((_event, session) => {
   // Re-render only when the signed-in person changes, not on token refresh.
   const id = session?.user?.id || null;
+  // supabase-js clears the sign-in tokens from the URL but leaves a bare "#".
+  if (location.href.endsWith('#')) history.replaceState(null, '', location.pathname + location.search);
   if (id === current) return;
   current = id;
   setTimeout(() => render(session), 0);
