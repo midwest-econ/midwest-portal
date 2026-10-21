@@ -5,7 +5,8 @@ Trade and Theory meetings. The public site stays on Google Sites; its
 **Submissions** menu item links here.
 
 - **Pages:** plain HTML/JS in this repository, served by GitHub Pages at
-  <https://midwest-econ.github.io/midwest-portal/>.
+  <https://portal.midwesttradetheory.org/> (custom domain, set in the `CNAME` file;
+  DNS at Namecheap). Email goes out through Resend from `mail.midwesttradetheory.org`.
 - **Backend:** Supabase (project `nvparnlljxvgapsddqzf`): email sign-in links,
   Postgres database, private PDF storage, and the access rules.
 - **Plan and roles:** see the shared memo "Midwest Submission Portal: Plan and Roles".
@@ -19,6 +20,7 @@ assets/app.js              page logic
 assets/style.css           styles matching the Google Site
 assets/banner.jpg          header photo
 supabase/migrations/       database setup, run in order in the Supabase SQL Editor
+supabase/email-templates/  sign-in emails, pasted into Supabase → Authentication → Emails
 ```
 
 ## Security rules
