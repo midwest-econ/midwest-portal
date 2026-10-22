@@ -37,8 +37,8 @@ const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
 const fmtDay = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US',
   { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 const fmtDeadline = (t: string) => new Date(t).toLocaleString('en-US',
-  { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
-    timeZone: 'America/New_York', timeZoneName: 'short' });
+  { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric',
+    minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' });
 
 // ---------------------------------------------------------------- email layout
 // Same look as the sign-in emails in supabase/email-templates/.

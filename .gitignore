@@ -1,2 +1,5 @@
 # Local working notes (paths, internal details) — not for the public repo
 CLAUDE.md
+
+# Supabase CLI local cache
+supabase/.temp/

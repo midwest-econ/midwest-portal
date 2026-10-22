@@ -32,6 +32,8 @@ function say(id, text, kind) {
 
 const fmtDate = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const fmtStamp = t => new Date(t).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+// Deadlines are announced in Eastern time, so show them that way wherever the reader is.
+const fmtDeadline = t => new Date(t).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' });
 const wordCount = s => (s.trim().match(/\S+/g) || []).length;
 
 function isOpen() {
@@ -53,7 +55,7 @@ async function loadMeeting() {
   $('meeting-line').textContent = `${meeting.name} meetings · ${meeting.location || meeting.host}${days}`;
 
   const rows = [['Submission deadline',
-    meeting.submission_deadline ? fmtStamp(meeting.submission_deadline) : 'To be announced']];
+    meeting.submission_deadline ? fmtDeadline(meeting.submission_deadline) : 'To be announced']];
   if (meeting.starts_on) rows.push(['Conference', `${fmtDate(meeting.starts_on)} – ${fmtDate(meeting.ends_on)}`]);
   $('dates').replaceChildren(...rows.flatMap(([k, v]) => {
     const dt = document.createElement('dt'); dt.textContent = k;
