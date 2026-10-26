@@ -1,0 +1,389 @@
+// Organizer dashboard: every submission with its reviews, sending batches of
+// papers to reviewers, the reviewer list, and meeting settings. Only signed-in
+// organizers get data back; the access rules are in the database.
+import { sb, $, show, say, esc, fmtStamp, fmtDeadline, people, openPdf, setupAuth, STATUS } from './common.js';
+
+// Each organizer works on one program (Trade or Theory), for every meeting or for one
+// meeting. The database only returns their own program's data; this page also hides
+// the other program's controls.
+let roles = [], meetings = [], meeting = null, myPrograms = [], subs = [], reviewers = [];
+const isAdmin = () => roles.some(r => r.meeting_admin);
+
+const lower = s => (s || '').trim().toLowerCase();
+const reviewsOf = s => s.assignments.filter(a => a.review);
+const mean = xs => xs.length ? xs.reduce((t, x) => t + x, 0) / xs.length : null;
+const reviewerById = id => reviewers.find(r => r.id === id);
+const authorEmails = s => [s.presenter_email, ...(s.coauthors || []).map(c => c.email)].map(lower);
+const affiliations = s => [s.presenter_affiliation, ...(s.coauthors || []).map(c => c.affiliation)].map(lower).filter(Boolean);
+const sameSchool = (s, r) => !!r.affiliation && affiliations(s).some(a => a.includes(lower(r.affiliation)) || lower(r.affiliation).includes(a));
+
+// ---------------------------------------------------------------- loading
+async function load() {
+  const [s, r] = await Promise.all([
+    sb.from('submissions')
+      .select('*, assignments(id, reviewer_id, due_on, invited_at, created_at, review:reviews(score, comments, updated_at))')
+      .eq('meeting_id', meeting.id).order('paper_no'),
+    sb.from('reviewers').select('*').order('name'),
+  ]);
+  if (s.error || r.error) return say('dash-msg', `Couldn't load the data: ${(s.error || r.error).message}`, 'bad');
+  subs = s.data.map(x => ({
+    ...x,
+    assignments: x.assignments.map(a => ({ ...a, review: Array.isArray(a.review) ? a.review[0] || null : a.review })),
+  }));
+  reviewers = r.data;
+  renderPapers(); renderBatchForm(); renderBatches(); renderReviewers(); fillSettings();
+}
+
+function pickMeeting(id) {
+  meeting = meetings.find(m => m.id === id) || meetings[0];
+  myPrograms = ['Trade', 'Theory'].filter(p => roles.some(r => r.program === p && (!r.meeting_id || r.meeting_id === meeting.id)));
+  const days = meeting.starts_on ? ` · ${new Date(meeting.starts_on + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}–${new Date(meeting.ends_on + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : '';
+  $('meeting-line').textContent = `${meeting.name} meetings · ${myPrograms.join(' & ')} program${days}`;
+
+  // Show only this organizer's program(s).
+  for (const el of document.querySelectorAll('[data-prog]')) el.hidden = !myPrograms.includes(el.dataset.prog);
+  for (const el of document.querySelectorAll('[data-both]')) el.hidden = myPrograms.length < 2;
+  const firstOf = name => document.querySelector(`[name=${name}][value="${myPrograms.length > 1 && name === 'p-prog' ? '' : myPrograms[0]}"]`);
+  firstOf('p-prog').checked = true;
+  firstOf('b-prog').checked = true;
+  show('s-admin', isAdmin());
+  return load();
+}
+
+// ---------------------------------------------------------------- tabs
+for (const b of document.querySelectorAll('.tabs [data-tab]')) {
+  b.addEventListener('click', () => {
+    for (const x of document.querySelectorAll('.tabs [data-tab]')) {
+      x.classList.toggle('on', x === b);
+      show(`tab-${x.dataset.tab}`, x === b);
+    }
+    show('dash-msg', false);
+  });
+}
+
+// ---------------------------------------------------------------- papers
+$('p-status').append(...Object.entries(STATUS).map(([k, [label]]) => new Option(label, k)));
+for (const el of [...document.querySelectorAll('[name=p-prog]'), $('p-status'), $('p-search')]) {
+  el.addEventListener('input', renderPapers);
+}
+
+function filtered() {
+  const prog = document.querySelector('[name=p-prog]:checked').value;
+  const st = $('p-status').value;
+  const q = lower($('p-search').value);
+  return subs.filter(s => (!prog || s.program === prog) && (!st || s.status === st) &&
+    (!q || lower([s.title, people(s), s.presenter_affiliation, ...(s.coauthors || []).map(c => c.affiliation)].join(' ')).includes(q)));
+}
+
+function renderPapers() {
+  const list = filtered();
+  const byProg = p => subs.filter(s => s.program === p && s.status !== 'withdrawn').length;
+  const scored = subs.filter(s => reviewsOf(s).length).length;
+  const split = myPrograms.length > 1 ? ` (${myPrograms.map(p => `${byProg(p)} ${p}`).join(', ')})` : '';
+  $('p-summary').textContent = `${subs.length} ${myPrograms.join(' & ')} submissions${split} · ${scored} with at least one score · showing ${list.length}`;
+
+  const statusSel = s => `<select data-status="${s.id}" aria-label="Status for paper ${s.paper_no}">` +
+    Object.entries(STATUS).map(([k, [label]]) => `<option value="${k}"${k === s.status ? ' selected' : ''}>${label}</option>`).join('') + '</select>';
+  const reviewCell = s => {
+    const done = reviewsOf(s), n = s.assignments.length;
+    if (!n) return '<span class="muted">none</span>';
+    const avg = mean(done.map(a => a.review.score));
+    return `<button type="button" class="linkbtn" data-open="${s.id}">${done.length}/${n}${avg ? ` · <b>${avg.toFixed(1)}</b>` : ''}</button>`;
+  };
+
+  $('p-table').innerHTML = `<thead><tr><th>#</th><th>Program</th><th>Paper</th><th>Submitted</th><th>PDF</th><th>Scores</th><th>Status</th></tr></thead><tbody>` +
+    list.map(s => `<tr>
+      <td>${s.paper_no}</td>
+      <td>${esc(s.program)}</td>
+      <td><b>${esc(s.title)}</b><div class="small muted">${esc(people(s))} · ${esc(s.presenter_affiliation)}</div></td>
+      <td class="small nowrap">${fmtStamp(s.created_at)}</td>
+      <td>${s.pdf_path ? `<button type="button" class="linkbtn" data-pdf="${esc(s.pdf_path)}">PDF</button>` : '<span class="muted">none</span>'}</td>
+      <td class="nowrap">${reviewCell(s)}</td>
+      <td>${statusSel(s)}</td>
+    </tr>
+    <tr class="detail" id="d-${s.id}" hidden><td></td><td colspan="6">${detail(s)}</td></tr>`).join('') + '</tbody>';
+}
+
+function detail(s) {
+  const rows = s.assignments.map(a => {
+    const r = reviewerById(a.reviewer_id);
+    const what = a.review
+      ? `<b>${a.review.score}</b>${a.review.comments ? ` · ${esc(a.review.comments)}` : ''}`
+      : `<span class="muted">not scored yet${a.invited_at ? ` · emailed ${fmtStamp(a.invited_at)}` : ' · not emailed'}</span>`;
+    return `<li>${esc(r?.name || 'Removed reviewer')}: ${what}</li>`;
+  });
+  return `<ul class="small reviews-list">${rows.join('')}</ul><details class="small"><summary>Abstract</summary><p class="abstract">${esc(s.abstract)}</p></details>`;
+}
+
+$('p-table').addEventListener('click', e => {
+  const pdf = e.target.closest('[data-pdf]');
+  if (pdf) return openPdf(pdf.dataset.pdf, 'dash-msg');
+  const open = e.target.closest('[data-open]');
+  if (open) $(`d-${open.dataset.open}`).hidden = !$(`d-${open.dataset.open}`).hidden;
+});
+
+$('p-table').addEventListener('change', async e => {
+  const sel = e.target.closest('[data-status]');
+  if (!sel) return;
+  const s = subs.find(x => x.id === Number(sel.dataset.status));
+  const { error } = await sb.rpc('set_submission_status', { sid: s.id, new_status: sel.value });
+  if (error) { sel.value = s.status; return say('dash-msg', `Status not changed: ${error.message}`, 'bad'); }
+  s.status = sel.value;
+  say('dash-msg', `Paper #${s.paper_no} is now "${STATUS[s.status][0]}". Authors see this on their submission page.`, 'ok');
+});
+
+$('p-csv').addEventListener('click', () => {
+  const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const head = ['Paper', 'Program', 'Title', 'Presenter', 'Affiliation', 'Email', 'Coauthors', 'Coauthor emails',
+    'Abstract', 'Submitted', 'Last edited', 'Status', 'Assigned', 'Scored', 'Mean score', 'Scores and comments'];
+  const rows = subs.map(s => {
+    const done = reviewsOf(s);
+    return [s.paper_no, s.program, s.title, s.presenter_name, s.presenter_affiliation, s.presenter_email,
+      (s.coauthors || []).map(c => c.affiliation ? `${c.name} (${c.affiliation})` : c.name).join('; '),
+      (s.coauthors || []).map(c => c.email).join('; '),
+      s.abstract, s.created_at, s.updated_at, STATUS[s.status]?.[0] || s.status,
+      s.assignments.length, done.length, mean(done.map(a => a.review.score))?.toFixed(2) ?? '',
+      done.map(a => `${reviewerById(a.reviewer_id)?.name}: ${a.review.score}${a.review.comments ? ` (${a.review.comments})` : ''}`).join(' | ')];
+  });
+  const csv = [head, ...rows].map(r => r.map(cell).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
+  a.download = `${meeting.id}-submissions.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ---------------------------------------------------------------- batches
+const batchProg = () => document.querySelector('[name=b-prog]:checked').value;
+const load_ = r => {
+  const mine = subs.flatMap(s => s.assignments).filter(a => a.reviewer_id === r.id);
+  return { n: mine.length, done: mine.filter(a => a.review).length };
+};
+
+function renderBatchForm() {
+  const prog = batchProg();
+  const pool = reviewers.filter(r => r.active && r.program === prog);
+  const keep = $('b-rev').value;
+  $('b-rev').replaceChildren(new Option(pool.length ? 'Choose a reviewer…' : `No active ${prog} reviewers yet (add them under Reviewers)`, ''),
+    ...pool.map(r => {
+      const { n } = load_(r);
+      return new Option(`${r.name}${r.affiliation ? `, ${r.affiliation}` : ''}${n ? ` · ${n} papers this meeting` : ''}`, r.id);
+    }));
+  if (pool.some(r => String(r.id) === keep)) $('b-rev').value = keep;
+  suggest();
+}
+
+function suggest() {
+  const r = reviewerById(Number($('b-rev').value));
+  if (!r) { $('b-list').replaceChildren(); $('b-send').disabled = true; $('b-count').textContent = ''; return; }
+  const size = Math.max(1, Number($('b-size').value) || 10);
+  const eligible = subs
+    .filter(s => s.program === r.program && s.status !== 'withdrawn' &&
+      !s.assignments.some(a => a.reviewer_id === r.id) && !authorEmails(s).includes(r.email))
+    .map(s => ({ s, school: sameSchool(s, r) }))
+    .sort((x, y) => x.s.assignments.length - y.s.assignments.length || x.s.paper_no - y.s.paper_no);
+  let picked = 0;
+  $('b-list').innerHTML = eligible.length ? `<div class="pick-list">` + eligible.map(({ s, school }) => {
+    const on = !school && picked < size && ++picked;
+    return `<label class="check"><input type="checkbox" value="${s.id}"${on ? ' checked' : ''}>
+      <span>#${s.paper_no} ${esc(s.title)} <span class="muted small">· ${esc(people(s))} · ${s.assignments.length} assigned</span>
+      ${school ? '<span class="pill warn">same school</span>' : ''}</span></label>`;
+  }).join('') + '</div>' : '<p class="muted small">No unassigned papers left for this reviewer.</p>';
+  countPicked();
+}
+
+function countPicked() {
+  const n = $('b-list').querySelectorAll('input:checked').length;
+  $('b-count').textContent = n ? `${n} papers selected` : '';
+  $('b-send').disabled = !n;
+}
+
+for (const el of document.querySelectorAll('[name=b-prog]')) el.addEventListener('change', renderBatchForm);
+$('b-rev').addEventListener('change', suggest);
+$('b-size').addEventListener('change', suggest);
+$('b-list').addEventListener('change', countPicked);
+
+$('b-send').addEventListener('click', async () => {
+  const r = reviewerById(Number($('b-rev').value));
+  const ids = [...$('b-list').querySelectorAll('input:checked')].map(i => Number(i.value));
+  if (!r || !ids.length) return;
+  if (!confirm(`Assign ${ids.length} papers to ${r.name} and email them now?`)) return;
+  $('b-send').disabled = true;
+  const due_on = $('b-due').value || null;
+  const { error } = await sb.from('assignments').insert(ids.map(submission_id => ({ submission_id, reviewer_id: r.id, due_on })));
+  if (error) { $('b-send').disabled = false; return say('dash-msg', `Nothing was assigned: ${error.message}`, 'bad'); }
+  const sent = await emailReviewer(r, 'invite');
+  await load();
+  if (sent) say('dash-msg', `Assigned ${ids.length} papers to ${r.name} and emailed them at ${r.email}.`, 'ok');
+});
+
+async function emailReviewer(r, mode) {
+  const { data, error } = await sb.functions.invoke('reviewer-email', { body: { reviewer_id: r.id, meeting_id: meeting.id, mode } });
+  if (error || !data?.sent) {
+    say('dash-msg', `The papers are assigned, but the email to ${r.name} didn't go out${error ? ` (${error.message})` : ''}. Use "Email again" under Batches sent.`, 'bad');
+    return false;
+  }
+  return true;
+}
+
+function renderBatches() {
+  const rows = reviewers.map(r => {
+    const mine = subs.flatMap(s => s.assignments.map(a => ({ ...a, s }))).filter(a => a.reviewer_id === r.id);
+    return { r, mine };
+  }).filter(x => x.mine.length);
+  $('b-table').innerHTML = rows.length
+    ? `<thead><tr><th>Reviewer</th><th>Program</th><th>Papers</th><th>Scored</th><th>Due</th><th>Last emailed</th><th></th></tr></thead><tbody>` +
+      rows.map(({ r, mine }) => {
+        const done = mine.filter(a => a.review).length;
+        const due = mine.map(a => a.due_on).filter(Boolean).sort()[0];
+        const last = mine.map(a => a.invited_at).filter(Boolean).sort().pop();
+        return `<tr><td>${esc(r.name)}<div class="small muted">${esc(r.email)}</div></td><td>${esc(r.program)}</td>
+          <td title="${esc(mine.map(a => '#' + a.s.paper_no).join(', '))}">${mine.length}</td>
+          <td>${done === mine.length ? `<span class="pill ok">${done}</span>` : done}</td>
+          <td class="nowrap">${due ? new Date(due + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</td>
+          <td class="small nowrap">${last ? fmtStamp(last) : '<span class="pill warn">not emailed</span>'}</td>
+          <td>${done < mine.length ? `<button type="button" class="btn ghost sm" data-remind="${r.id}">Email again</button>` : ''}</td></tr>`;
+      }).join('') + '</tbody>'
+    : '<tbody><tr><td class="muted">No batches sent yet.</td></tr></tbody>';
+}
+
+$('b-table').addEventListener('click', async e => {
+  const b = e.target.closest('[data-remind]');
+  if (!b) return;
+  const r = reviewerById(Number(b.dataset.remind));
+  if (!confirm(`Email ${r.name} a reminder listing the papers they haven't scored yet?`)) return;
+  b.disabled = true;
+  if (await emailReviewer(r, 'remind')) { await load(); say('dash-msg', `Reminder sent to ${r.name}.`, 'ok'); }
+  else b.disabled = false;
+});
+
+// ---------------------------------------------------------------- reviewers
+function renderReviewers() {
+  $('r-table').innerHTML = reviewers.length
+    ? `<thead><tr><th>Name</th><th>Email</th><th>Affiliation</th><th>Program</th><th>This meeting</th><th>Active</th><th></th></tr></thead><tbody>` +
+      reviewers.map(r => {
+        const { n, done } = load_(r);
+        return `<tr><td>${esc(r.name)}</td><td class="small">${esc(r.email)}</td><td class="small">${esc(r.affiliation || '')}</td><td>${esc(r.program)}</td>
+          <td class="small">${n ? `${done}/${n} scored` : ''}</td>
+          <td><input type="checkbox" data-active="${r.id}"${r.active ? ' checked' : ''} aria-label="${esc(r.name)} active"></td>
+          <td>${n ? '' : `<button type="button" class="linkbtn" data-remove="${r.id}">Remove</button>`}</td></tr>`;
+      }).join('') + '</tbody>'
+    : '<tbody><tr><td class="muted">No reviewers yet. Add the scientific committee below.</td></tr></tbody>';
+}
+
+$('r-table').addEventListener('change', async e => {
+  const box = e.target.closest('[data-active]');
+  if (!box) return;
+  const { error } = await sb.from('reviewers').update({ active: box.checked }).eq('id', Number(box.dataset.active));
+  if (error) { box.checked = !box.checked; return say('dash-msg', `Not changed: ${error.message}`, 'bad'); }
+  reviewerById(Number(box.dataset.active)).active = box.checked;
+  renderBatchForm();
+});
+
+$('r-table').addEventListener('click', async e => {
+  const b = e.target.closest('[data-remove]');
+  if (!b) return;
+  const r = reviewerById(Number(b.dataset.remove));
+  if (!confirm(`Remove ${r.name} from the reviewer list?`)) return;
+  const { error } = await sb.from('reviewers').delete().eq('id', r.id);
+  if (error?.code === '23503') return say('dash-msg', `${r.name} has papers from an earlier meeting, so they stay on the list. Untick Active instead.`, 'warn');
+  if (error) return say('dash-msg', `Not removed: ${error.message}`, 'bad');
+  await load();
+});
+
+// "Name, email, affiliation (may contain commas), Trade|Theory" per line.
+function parseReviewers(text) {
+  const rows = [], bad = [];
+  for (const line of text.split('\n').map(l => l.trim()).filter(Boolean)) {
+    const parts = line.split(/\t|,/).map(p => p.trim()).filter(Boolean);
+    const at = parts.findIndex(p => /^\S+@\S+\.\S+$/.test(p));
+    const prog = parts.at(-1) && ['trade', 'theory'].includes(parts.at(-1).toLowerCase()) ? parts.at(-1) : null;
+    if (at < 1 || !prog) { bad.push(line); continue; }
+    rows.push({
+      name: parts.slice(0, at).join(' '),
+      email: parts[at].toLowerCase(),
+      affiliation: parts.slice(at + 1, -1).join(', ') || null,
+      program: prog[0].toUpperCase() + prog.slice(1).toLowerCase(),
+    });
+  }
+  return { rows, bad };
+}
+
+$('r-add').addEventListener('click', async () => {
+  const { rows, bad } = parseReviewers($('r-bulk').value);
+  if (bad.length) return say('dash-msg', `Couldn't read: "${bad[0]}". Use: name, email, affiliation, Trade or Theory.`, 'bad');
+  if (!rows.length) return;
+  const other = rows.find(r => !myPrograms.includes(r.program));
+  if (other) return say('dash-msg', `${other.name} is listed for ${other.program}, which isn't your program. Each program adds its own reviewers.`, 'bad');
+  const { error } = await sb.from('reviewers').upsert(rows, { onConflict: 'email' });
+  if (error) return say('dash-msg', `Not saved: ${error.message}`, 'bad');
+  $('r-bulk').value = '';
+  await load();
+  say('dash-msg', `Saved ${rows.length} reviewer${rows.length > 1 ? 's' : ''}.`, 'ok');
+});
+
+// ---------------------------------------------------------------- settings
+function fillSettings() {
+  $('s-open').checked = meeting.submissions_open;
+  if (meeting.submission_deadline) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date(meeting.submission_deadline)).map(x => [x.type, x.value]));
+    $('s-date').value = `${p.year}-${p.month}-${p.day}`;
+    $('s-time').value = `${p.hour}:${p.minute}`;
+  }
+  $('s-now').textContent = meeting.submission_deadline ? `Now: ${fmtDeadline(meeting.submission_deadline)}` : 'No deadline set.';
+  $('s-trade').value = meeting.review_instructions?.Trade || '';
+  $('s-theory').value = meeting.review_instructions?.Theory || '';
+}
+
+$('s-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  // Instructions: each program's organizers save only their own program's text.
+  for (const p of myPrograms) {
+    const body = $(p === 'Trade' ? 's-trade' : 's-theory').value.trim();
+    const { error } = await sb.rpc('set_review_instructions', { m: meeting.id, prog: p, body });
+    if (error) return say('dash-msg', `${p} instructions not saved: ${error.message}`, 'bad');
+  }
+  // Opening/closing and the deadline are meeting-wide: meeting admins only.
+  if (isAdmin()) {
+    const d = $('s-date').value, t = $('s-time').value || '23:59';
+    const { error } = await sb.from('meetings').update({
+      submissions_open: $('s-open').checked,
+      // Postgres reads the zone name, so the deadline is exactly this time in Eastern.
+      submission_deadline: d ? `${d} ${t}:59 America/New_York` : null,
+    }).eq('id', meeting.id);
+    if (error) return say('dash-msg', `Deadline not saved: ${error.message}`, 'bad');
+  }
+  const { data } = await sb.from('meetings').select('*').eq('id', meeting.id).single();
+  Object.assign(meeting, data);
+  fillSettings();
+  say('dash-msg', 'Settings saved.', 'ok');
+});
+
+// ---------------------------------------------------------------- start
+$('meeting-sel').addEventListener('change', e => pickMeeting(e.target.value));
+
+async function onUser(user) {
+  show('loading', false);
+  show('signin', !user);
+  show('dash', false);
+  show('notice', false);
+  if (!user) return;
+  const { data: mine } = await sb.from('organizers').select('program, meeting_id, meeting_admin').eq('user_id', user.id);
+  roles = mine || [];
+  if (!roles.length) return say('notice', `${user.email} isn't an organizer account. Authors submit at the Submissions page; reviewers use the Review page.`, 'warn');
+
+  const { data, error } = await sb.from('meetings').select('*').order('starts_on', { ascending: false });
+  if (error) return say('notice', `Couldn't load meetings: ${error.message}`, 'bad');
+  // Only the meetings this person organizes (all of them for an unscoped role).
+  meetings = data.filter(m => roles.some(r => !r.meeting_id || r.meeting_id === m.id));
+  if (!meetings.length) return say('notice', 'Your organizer role is for a meeting that no longer exists. Write to mwittconference@utk.edu.', 'warn');
+  $('meeting-sel').replaceChildren(...meetings.map(m => new Option(m.name, m.id)));
+  show('meeting-pick', meetings.length > 1);
+  show('dash');
+  const current = meetings.find(m => m.submissions_open) || meetings[0];
+  $('meeting-sel').value = current.id;
+  await pickMeeting(current.id);
+}
+
+setupAuth(onUser);

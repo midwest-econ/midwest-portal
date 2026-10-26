@@ -1,0 +1,56 @@
+// Email sign-in with a one-time code, used by every page. Step 1 emails a code;
+// step 2 checks it, and Supabase signs the person in (each page's auth listener
+// takes it from there). The email has no link on purpose: university mail filters
+// hold messages with sign-in links, or open the links to scan them and use them up.
+// Pages provide #signin-form, #signin-email, #signin-btn, #signin-msg and the code
+// step: #code-step, #signin-code, #code-btn, #code-resend, #code-change.
+const $ = id => document.getElementById(id);
+
+export function wireSignIn(sb, say) {
+  const email = $('signin-email'), code = $('signin-code');
+  let sentTo = null;
+
+  function codeStep(on) {
+    $('code-step').hidden = !on;
+    $('signin-btn').hidden = on;
+    email.readOnly = on;
+    code.value = '';
+    if (on) code.focus();
+  }
+
+  async function send() {
+    const addr = email.value.trim();
+    if (!addr) return;
+    $('signin-btn').disabled = $('code-resend').disabled = true;
+    const { error } = await sb.auth.signInWithOtp({ email: addr });
+    $('signin-btn').disabled = $('code-resend').disabled = false;
+    if (error) return say('signin-msg', `Couldn't send the code: ${error.message}`, 'bad');
+    sentTo = addr;
+    codeStep(true);
+    say('signin-msg', `We emailed a sign-in code to ${addr}. It can take a minute or two. If it doesn't arrive, check your spam or quarantine folder for mail from portal@mail.midwesttradetheory.org.`, 'ok');
+  }
+
+  async function verify() {
+    const token = code.value.replace(/\D/g, '');
+    if (token.length < 6) return say('signin-msg', 'Enter the code from the email.', 'bad');
+    $('code-btn').disabled = true;
+    const { error } = await sb.auth.verifyOtp({ email: sentTo, token, type: 'email' });
+    $('code-btn').disabled = false;
+    if (error) return say('signin-msg', "That code didn't work. It may be mistyped, expired (codes last an hour) or already used. Check it, or send a new code.", 'bad');
+    // Signed in: reset the form for the next sign-in after a sign-out.
+    say('signin-msg', '', 'ok');
+    codeStep(false);
+  }
+
+  $('signin-form').addEventListener('submit', e => {
+    e.preventDefault();
+    $('code-step').hidden ? send() : verify();
+  });
+  $('code-resend').addEventListener('click', send);
+  $('code-change').addEventListener('click', () => {
+    sentTo = null;
+    codeStep(false);
+    say('signin-msg', '', 'ok');
+    email.focus();
+  });
+}

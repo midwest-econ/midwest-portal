@@ -3,6 +3,7 @@
 // (supabase/migrations/001_submissions.sql); this page only shows and sends.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 import { SUPABASE_URL, SUPABASE_KEY, MAX_PDF_MB, MAX_ABSTRACT_WORDS } from './config.js';
+import { wireSignIn } from './signin.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = id => document.getElementById(id);
@@ -65,19 +66,7 @@ async function loadMeeting() {
 }
 
 // ---------------------------------------------------------------- sign-in
-$('signin-form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const email = $('signin-email').value.trim();
-  if (!email) return;
-  $('signin-btn').disabled = true;
-  const { error } = await sb.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: location.origin + location.pathname },
-  });
-  $('signin-btn').disabled = false;
-  if (error) say('signin-msg', `Couldn't send the link: ${error.message}`, 'bad');
-  else say('signin-msg', `Check ${email} for a sign-in link. It may take a minute; look in spam if it doesn't arrive.`, 'ok');
-});
+wireSignIn(sb, say);
 
 $('sign-out').addEventListener('click', () => sb.auth.signOut());
 

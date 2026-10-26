@@ -1,16 +1,19 @@
 <!-- Supabase → Authentication → Emails → Templates → Magic Link
-     Subject: Your sign-in link for the Midwest Trade & Theory Conference -->
+     Subject: Your sign-in code for the Midwest Trade & Theory Conference
+     Code only, no link: university mail filters hold emails with sign-in links, or
+     open the links to scan them and use them up. -->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:24px 0;font-family:Georgia,'Times New Roman',serif;">
   <tr><td align="center">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-top:4px solid #226e93;">
       <tr><td style="padding:28px 32px 8px;">
         <p style="margin:0;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#226e93;font-family:Arial,Helvetica,sans-serif;">Midwest Trade &amp; Theory Conference</p>
-        <h1 style="margin:8px 0 0;font-size:22px;font-weight:normal;color:#1f2a33;">Sign in to the submission portal</h1>
+        <h1 style="margin:8px 0 0;font-size:22px;font-weight:normal;color:#1f2a33;">Your sign-in code</h1>
       </td></tr>
       <tr><td style="padding:16px 32px;font-size:16px;line-height:1.5;color:#1f2a33;">
-        <p style="margin:0 0 16px;">You asked to sign in to the Midwest Trade &amp; Theory Conference submission portal as {{ .Email }}. Click the button to continue:</p>
-        <p style="margin:0 0 20px;"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#226e93;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:4px;font-family:Arial,Helvetica,sans-serif;font-size:15px;">Sign in</a></p>
-        <p style="margin:0 0 16px;font-size:14px;color:#55626d;">The link works once and expires after an hour. If you didn't ask to sign in, you can ignore this email.</p>
+        <p style="margin:0 0 16px;">Here is your code to sign in to the Midwest Trade &amp; Theory Conference portal as {{ .Email }}:</p>
+        <p style="margin:0 0 20px;font-family:'Courier New',Courier,monospace;font-size:32px;font-weight:bold;letter-spacing:6px;color:#226e93;">{{ .Token }}</p>
+        <p style="margin:0 0 16px;">Enter it on the sign-in page where you asked for it.</p>
+        <p style="margin:0 0 16px;font-size:14px;color:#55626d;">The code works once and expires after an hour. If you didn't ask to sign in, you can ignore this email.</p>
       </td></tr>
       <tr><td style="padding:16px 32px 28px;border-top:1px solid #e3e7ea;font-size:13px;line-height:1.5;color:#55626d;font-family:Arial,Helvetica,sans-serif;">
         Questions? Email <a href="mailto:mwittconference@utk.edu" style="color:#226e93;">mwittconference@utk.edu</a>. Replies to this message are not read.

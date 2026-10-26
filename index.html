@@ -47,14 +47,25 @@
   <section id="signin" hidden>
     <div class="page-head">
       <h2>Sign in to submit</h2>
-      <p class="lede">Enter your email and we'll send you a sign-in link. There is no password. Your account carries over to future meetings.</p>
+      <p class="lede">Enter your email and we'll send you a sign-in code. There is no password. Your account carries over to future meetings.</p>
     </div>
     <form class="panel stack narrow" id="signin-form">
       <div class="field">
         <label for="signin-email">Email address</label>
         <input id="signin-email" type="email" autocomplete="email" required>
       </div>
-      <div class="btnrow"><button class="btn" type="submit" id="signin-btn">Email me a sign-in link</button></div>
+      <div class="btnrow"><button class="btn" type="submit" id="signin-btn">Email me a sign-in code</button></div>
+      <div class="stack" id="code-step" hidden>
+        <div class="field">
+          <label for="signin-code">Sign-in code from the email</label>
+          <input id="signin-code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="12" spellcheck="false">
+        </div>
+        <div class="btnrow">
+          <button class="btn" type="submit" id="code-btn">Sign in</button>
+          <button class="linkbtn" type="button" id="code-resend">Send a new code</button>
+          <button class="linkbtn" type="button" id="code-change">Use a different email</button>
+        </div>
+      </div>
       <div id="signin-msg" class="msg" hidden></div>
     </form>
   </section>

@@ -1,17 +1,19 @@
 <!-- Supabase → Authentication → Emails → Templates → Confirm signup
      Sent the first time someone signs in with a new email address.
-     Subject: Confirm your email for the Midwest Trade & Theory Conference -->
+     Subject: Your sign-in code for the Midwest Trade & Theory Conference
+     Code only, no link (see magic-link.html). -->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:24px 0;font-family:Georgia,'Times New Roman',serif;">
   <tr><td align="center">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-top:4px solid #226e93;">
       <tr><td style="padding:28px 32px 8px;">
         <p style="margin:0;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#226e93;font-family:Arial,Helvetica,sans-serif;">Midwest Trade &amp; Theory Conference</p>
-        <h1 style="margin:8px 0 0;font-size:22px;font-weight:normal;color:#1f2a33;">Confirm your email address</h1>
+        <h1 style="margin:8px 0 0;font-size:22px;font-weight:normal;color:#1f2a33;">Your sign-in code</h1>
       </td></tr>
       <tr><td style="padding:16px 32px;font-size:16px;line-height:1.5;color:#1f2a33;">
-        <p style="margin:0 0 16px;">Someone, probably you, used {{ .Email }} to sign in to the Midwest Trade &amp; Theory Conference submission portal for the first time. Click the button to confirm your address and sign in:</p>
-        <p style="margin:0 0 20px;"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#226e93;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:4px;font-family:Arial,Helvetica,sans-serif;font-size:15px;">Confirm and sign in</a></p>
-        <p style="margin:0 0 16px;font-size:14px;color:#55626d;">There is no password: each time you sign in we email you a link like this one. Your account carries over to future meetings. If you didn't ask for this, you can ignore this email.</p>
+        <p style="margin:0 0 16px;">Welcome to the Midwest Trade &amp; Theory Conference portal. Here is your code to sign in for the first time as {{ .Email }}:</p>
+        <p style="margin:0 0 20px;font-family:'Courier New',Courier,monospace;font-size:32px;font-weight:bold;letter-spacing:6px;color:#226e93;">{{ .Token }}</p>
+        <p style="margin:0 0 16px;">Enter it on the sign-in page where you asked for it.</p>
+        <p style="margin:0 0 16px;font-size:14px;color:#55626d;">The code works once and expires after an hour. There is no password: each time you sign in we email you a new code, and your account carries over to future meetings. If you didn't ask for this, you can ignore this email.</p>
       </td></tr>
       <tr><td style="padding:16px 32px 28px;border-top:1px solid #e3e7ea;font-size:13px;line-height:1.5;color:#55626d;font-family:Arial,Helvetica,sans-serif;">
         Questions? Email <a href="mailto:mwittconference@utk.edu" style="color:#226e93;">mwittconference@utk.edu</a>. Replies to this message are not read.

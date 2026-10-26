@@ -46,13 +46,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Signed-in bar */
 .userbar { background: var(--mist); border-bottom: 1px solid var(--rule); font-family: var(--f-ui); font-size: .86rem; }
 .userbar .wrap { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; padding-block: 9px; }
+.code-input { font-family: var(--f-ui); font-size: 1.4rem; letter-spacing: .25em; max-width: 14ch; }
 .linkbtn { background: none; border: 0; padding: 0; color: var(--teal); text-decoration: underline; cursor: pointer; font-family: var(--f-ui); font-size: .86rem; }
 
 /* Page */
 main { padding-block: 34px 60px; }
 .page-head { margin-bottom: 26px; }
 .page-head h2 { font-size: clamp(1.8rem, 4vw, 2.5rem); color: var(--teal); line-height: 1.2; }
-.lede { color: var(--ink-2); max-width: 62ch; margin-top: 6px; }
+.lede { color: var(--ink-2); margin-top: 6px; }
 .eyebrow { font-family: var(--f-ui); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
 h3 { font-size: 1.3rem; color: var(--teal); line-height: 1.3; }
 .cols { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 32px; align-items: start; }
@@ -105,6 +106,36 @@ h3 { font-size: 1.3rem; color: var(--teal); line-height: 1.3; }
 .kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; font-size: .94rem; margin: 10px 0 0; }
 .kv dt { font-family: var(--f-ui); font-size: .78rem; color: var(--ink-3); padding-top: 2px; }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
+
+/* Organizer + review pages */
+.hero-title.slim { padding-block: 30px 34px; }
+.dash-head { display: flex; justify-content: space-between; align-items: end; gap: 12px 24px; flex-wrap: wrap; margin-bottom: 18px; border-bottom: 1px solid var(--rule); }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 14px; cursor: pointer; font-family: var(--f-ui); font-size: .9rem; color: var(--ink-2); }
+.tabs button.on { color: var(--teal); border-bottom-color: var(--teal); font-weight: 700; }
+.meeting-pick { padding-bottom: 8px; min-width: 180px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+.toolbar .field select, .toolbar .field input { padding: 7px 10px; }
+.toolbar .grow { flex: 1 1 220px; }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: .92rem; }
+.tbl th { text-align: left; font-family: var(--f-ui); font-size: .74rem; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); background: var(--mist); padding: 8px 10px; }
+.tbl td { padding: 8px 10px; border-top: 1px solid var(--rule); vertical-align: top; }
+.tbl select { border: 1px solid #c9ced2; border-radius: 4px; padding: 3px 6px; font-size: .85rem; }
+.tbl tr.detail td { background: var(--teal-tint); border-top: 0; }
+.nowrap { white-space: nowrap; }
+.reviews-list { margin: 0 0 8px; padding-left: 18px; }
+.pick-list { display: grid; gap: 6px; max-height: 420px; overflow-y: auto; border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; }
+details > summary { cursor: pointer; font-family: var(--f-ui); color: var(--teal); }
+.abstract, .instructions { white-space: pre-line; margin-top: 6px; }
+.meeting-h { font-size: 1.5rem; color: var(--teal); }
+.paper-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.scale { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--teal-line); border-radius: 4px; overflow: hidden; justify-self: start; }
+.scale label { width: 46px; text-align: center; padding: 7px 0; cursor: pointer; color: var(--teal); font-family: var(--f-ui); }
+.scale label + label { border-left: 1px solid var(--teal-line); }
+.scale input { position: absolute; opacity: 0; pointer-events: none; }
+.scale label:has(input:checked) { background: var(--teal); color: #fff; }
+.scale label:has(input:focus-visible) { outline: 2px solid var(--teal); outline-offset: -3px; }
 
 footer { background: var(--ink); color: rgba(255,255,255,.7); font-family: var(--f-ui); font-size: .82rem; }
 footer .wrap { padding-block: 26px; display: flex; justify-content: space-between; gap: 10px 24px; flex-wrap: wrap; }

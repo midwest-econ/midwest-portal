@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Organizer Dashboard · Midwest Trade &amp; Theory</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gentium+Basic:ital,wght@0,400;0,700;1,400&family=Lato:wght@400;700&family=Lora:ital,wght@0,400;0,600;1,400&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap topnav">
+    <a class="sitename" href="https://sites.google.com/view/midwesttradetheoryconference/home">Midwest Trade &amp; Theory</a>
+    <nav class="navlinks" aria-label="Site">
+      <a href="./">Submissions</a>
+      <a href="review.html">Review</a>
+      <a href="organizer.html" class="on">Organizers</a>
+    </nav>
+  </div>
+  <div class="wrap hero-title slim">
+    <h1>Organizer Dashboard</h1>
+    <p id="meeting-line">&nbsp;</p>
+  </div>
+</header>
+
+<div class="userbar" id="userbar" hidden>
+  <div class="wrap">
+    <span>Signed in as <b id="user-email"></b></span>
+    <button class="linkbtn" type="button" id="sign-out">Sign out</button>
+  </div>
+</div>
+
+<main class="wrap">
+  <p id="loading" class="muted">Loading…</p>
+  <div id="notice" class="msg warn narrow" hidden></div>
+
+  <section id="signin" hidden>
+    <div class="page-head">
+      <h2>Organizers sign in</h2>
+      <p class="lede">We'll email you a sign-in code; there is no password.</p>
+    </div>
+    <form class="panel stack narrow" id="signin-form">
+      <div class="field">
+        <label for="signin-email">Email address</label>
+        <input id="signin-email" type="email" autocomplete="email" required>
+      </div>
+      <div class="btnrow"><button class="btn" type="submit" id="signin-btn">Email me a sign-in code</button></div>
+      <div class="stack" id="code-step" hidden>
+        <div class="field">
+          <label for="signin-code">Sign-in code from the email</label>
+          <input id="signin-code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="12" spellcheck="false">
+        </div>
+        <div class="btnrow">
+          <button class="btn" type="submit" id="code-btn">Sign in</button>
+          <button class="linkbtn" type="button" id="code-resend">Send a new code</button>
+          <button class="linkbtn" type="button" id="code-change">Use a different email</button>
+        </div>
+      </div>
+      <div id="signin-msg" class="msg" hidden></div>
+    </form>
+  </section>
+
+  <section id="dash" hidden>
+    <div class="dash-head">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-tab="papers" class="on">Papers</button>
+        <button type="button" role="tab" data-tab="batch">Send a batch</button>
+        <button type="button" role="tab" data-tab="reviewers">Reviewers</button>
+        <button type="button" role="tab" data-tab="settings">Settings</button>
+      </div>
+      <div class="field meeting-pick" id="meeting-pick" hidden>
+        <label for="meeting-sel">Meeting</label>
+        <select id="meeting-sel"></select>
+      </div>
+    </div>
+    <div id="dash-msg" class="msg" hidden></div>
+
+    <!-- Papers -->
+    <div id="tab-papers" class="stack">
+      <div class="toolbar">
+        <div class="seg" role="radiogroup" aria-label="Program">
+          <label data-both><input type="radio" name="p-prog" value="" checked> All</label>
+          <label data-prog="Trade"><input type="radio" name="p-prog" value="Trade"> Trade</label>
+          <label data-prog="Theory"><input type="radio" name="p-prog" value="Theory"> Theory</label>
+        </div>
+        <div class="field"><select id="p-status" aria-label="Status"><option value="">Any status</option></select></div>
+        <div class="field grow"><input id="p-search" type="search" placeholder="Search titles, authors, affiliations" aria-label="Search"></div>
+        <button type="button" class="btn ghost sm" id="p-csv">Download spreadsheet (CSV)</button>
+      </div>
+      <p class="muted small" id="p-summary"></p>
+      <div class="tbl-wrap"><table class="tbl" id="p-table"></table></div>
+    </div>
+
+    <!-- Send a batch -->
+    <div id="tab-batch" class="stack" hidden>
+      <div class="panel stack">
+        <h3>Send a batch to a reviewer</h3>
+        <p class="muted small">Papers with the fewest reviews come first. Papers the reviewer wrote or coauthored are left out, and papers from the reviewer's own school are flagged and not pre-ticked.</p>
+        <div class="toolbar">
+          <div class="seg" role="radiogroup" aria-label="Program">
+            <label data-prog="Trade"><input type="radio" name="b-prog" value="Trade" checked> Trade</label>
+            <label data-prog="Theory"><input type="radio" name="b-prog" value="Theory"> Theory</label>
+          </div>
+          <div class="field grow"><label for="b-rev">Reviewer</label><select id="b-rev"></select></div>
+          <div class="field"><label for="b-size">Papers</label><input id="b-size" type="number" min="1" max="40" value="10"></div>
+          <div class="field"><label for="b-due">Scores due</label><input id="b-due" type="date"></div>
+        </div>
+        <div id="b-list" class="stack"></div>
+        <div class="btnrow">
+          <button type="button" class="btn" id="b-send" disabled>Assign and email the reviewer</button>
+          <span class="hint" id="b-count"></span>
+        </div>
+      </div>
+      <div class="stack">
+        <h3>Batches sent</h3>
+        <div class="tbl-wrap"><table class="tbl" id="b-table"></table></div>
+      </div>
+    </div>
+
+    <!-- Reviewers -->
+    <div id="tab-reviewers" class="stack" hidden>
+      <div class="tbl-wrap"><table class="tbl" id="r-table"></table></div>
+      <div class="panel stack">
+        <h3>Add or update reviewers</h3>
+        <p class="muted small">One per line: name, email, affiliation, program (Trade or Theory). An existing email is updated rather than added twice.</p>
+        <div class="field"><textarea id="r-bulk" rows="5" placeholder="Kristy Buzard, kbuzard@syr.edu, Syracuse University, Trade"></textarea></div>
+        <div class="btnrow"><button type="button" class="btn" id="r-add">Save reviewers</button></div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div id="tab-settings" class="stack" hidden>
+      <form class="panel stack" id="s-form">
+        <div class="stack" id="s-admin">
+          <h3>Submissions <span class="muted small">(both programs)</span></h3>
+          <label class="check"><input type="checkbox" id="s-open"> Submissions are open for this meeting</label>
+          <div class="grid2">
+            <div class="field"><label for="s-date">Deadline date</label><input id="s-date" type="date"></div>
+            <div class="field"><label for="s-time">Deadline time (Eastern)</label><input id="s-time" type="time" value="23:59"></div>
+          </div>
+          <p class="hint" id="s-now"></p>
+        </div>
+        <h3>Review instructions</h3>
+        <p class="muted small">Shown on the review page and in each invitation email.</p>
+        <div class="field" data-prog="Trade"><label for="s-trade">Trade</label><textarea id="s-trade" rows="10"></textarea></div>
+        <div class="field" data-prog="Theory"><label for="s-theory">Theory</label><textarea id="s-theory" rows="10"></textarea></div>
+        <div class="btnrow"><button class="btn" type="submit">Save settings</button></div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span><b>Midwest International Economics Group</b></span>
+    <span>Organizers only</span>
+  </div>
+</footer>
+
+<script type="module" src="assets/organizer.js"></script>
+</body>
+</html>
