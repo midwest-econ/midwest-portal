@@ -5,6 +5,7 @@
 // Pages provide #signin-form, #signin-email, #signin-btn, #signin-msg and the code
 // step: #code-step, #signin-code, #code-btn, #code-resend, #code-change.
 const $ = id => document.getElementById(id);
+const HELP = 'Having trouble signing in? Email mwittconference@utk.edu and we will help.';
 
 export function wireSignIn(sb, say) {
   const email = $('signin-email'), code = $('signin-code');
@@ -24,10 +25,10 @@ export function wireSignIn(sb, say) {
     $('signin-btn').disabled = $('code-resend').disabled = true;
     const { error } = await sb.auth.signInWithOtp({ email: addr });
     $('signin-btn').disabled = $('code-resend').disabled = false;
-    if (error) return say('signin-msg', `Couldn't send the code: ${error.message}`, 'bad');
+    if (error) return say('signin-msg', `Couldn't send the code: ${error.message.replace(/\.$/, '')}. ${HELP}`, 'bad');
     sentTo = addr;
     codeStep(true);
-    say('signin-msg', `We emailed a sign-in code to ${addr}. It can take a minute or two. If it doesn't arrive, check your spam or quarantine folder for mail from portal@mail.midwesttradetheory.org.`, 'ok');
+    say('signin-msg', `We emailed a sign-in code to ${addr}. It can take a minute or two. If it doesn't arrive, check your spam or quarantine folder for mail from portal@mail.midwesttradetheory.org. ${HELP}`, 'ok');
   }
 
   async function verify() {
@@ -36,7 +37,7 @@ export function wireSignIn(sb, say) {
     $('code-btn').disabled = true;
     const { error } = await sb.auth.verifyOtp({ email: sentTo, token, type: 'email' });
     $('code-btn').disabled = false;
-    if (error) return say('signin-msg', "That code didn't work. It may be mistyped, expired (codes last an hour) or already used. Check it, or send a new code.", 'bad');
+    if (error) return say('signin-msg', `That code didn't work. It may be mistyped, expired (codes last an hour) or already used. Check it, or send a new code. ${HELP}`, 'bad');
     // Signed in: reset the form for the next sign-in after a sign-out.
     say('signin-msg', '', 'ok');
     codeStep(false);
