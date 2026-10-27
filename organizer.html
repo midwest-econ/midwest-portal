@@ -47,7 +47,10 @@
         <label for="signin-email">Email address</label>
         <input id="signin-email" type="email" autocomplete="email" required>
       </div>
-      <div class="btnrow"><button class="btn" type="submit" id="signin-btn">Email me a sign-in code</button></div>
+      <div class="btnrow" id="send-row">
+        <button class="btn" type="submit" id="signin-btn">Email me a sign-in code</button>
+        <button class="linkbtn" type="button" id="code-have">I already have a code</button>
+      </div>
       <div class="stack" id="code-step" hidden>
         <div class="field">
           <label for="signin-code">Sign-in code from the email</label>
@@ -149,6 +152,31 @@
         <div class="field" data-prog="Theory"><label for="s-theory">Theory</label><textarea id="s-theory" rows="10"></textarea></div>
         <div class="btnrow"><button class="btn" type="submit">Save settings</button></div>
       </form>
+
+      <div class="panel stack" id="help-panel" hidden>
+        <h3>Sign-in help <span class="muted small">(meeting admins)</span></h3>
+        <p class="muted small">For someone whose sign-in code emails aren't arriving. Get a code here and send it to them from your own email, or read it out by phone. It works once, for one hour, and asking for another code replaces it. The portal emails nothing.</p>
+        <div class="toolbar">
+          <div class="field grow"><label for="h-email">Their email address</label><input id="h-email" type="email" autocomplete="off"></div>
+          <div class="field"><label for="h-page">They are</label>
+            <select id="h-page">
+              <option value="">submitting a paper</option>
+              <option value="review.html">reviewing</option>
+              <option value="organizer.html">organizing</option>
+            </select>
+          </div>
+          <button type="button" class="btn" id="h-get">Get a sign-in code</button>
+        </div>
+        <div id="h-result" class="stack" hidden>
+          <p class="code-show" id="h-code"></p>
+          <div class="field"><label for="h-text">Message to send them</label><textarea id="h-text" rows="6" readonly></textarea></div>
+          <div class="btnrow"><button type="button" class="btn ghost sm" id="h-copy">Copy the message</button></div>
+        </div>
+        <div>
+          <p class="lbl">Codes given out recently</p>
+          <ul class="small reviews-list" id="h-log"></ul>
+        </div>
+      </div>
     </div>
   </section>
 </main>

@@ -54,7 +54,10 @@
         <label for="signin-email">Email address</label>
         <input id="signin-email" type="email" autocomplete="email" required>
       </div>
-      <div class="btnrow"><button class="btn" type="submit" id="signin-btn">Email me a sign-in code</button></div>
+      <div class="btnrow" id="send-row">
+        <button class="btn" type="submit" id="signin-btn">Email me a sign-in code</button>
+        <button class="linkbtn" type="button" id="code-have">I already have a code</button>
+      </div>
       <div class="stack" id="code-step" hidden>
         <div class="field">
           <label for="signin-code">Sign-in code from the email</label>

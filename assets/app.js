@@ -3,7 +3,7 @@
 // (supabase/migrations/001_submissions.sql); this page only shows and sends.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 import { SUPABASE_URL, SUPABASE_KEY, MAX_PDF_MB, MAX_ABSTRACT_WORDS } from './config.js';
-import { wireSignIn } from './signin.js';
+import { wireSignIn, wireSignOut } from './signin.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = id => document.getElementById(id);
@@ -68,7 +68,7 @@ async function loadMeeting() {
 // ---------------------------------------------------------------- sign-in
 wireSignIn(sb, say);
 
-$('sign-out').addEventListener('click', () => sb.auth.signOut());
+wireSignOut(sb);
 
 // ---------------------------------------------------------------- coauthors
 function addCoauthor(c = {}) {

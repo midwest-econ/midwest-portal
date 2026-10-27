@@ -3,7 +3,7 @@
 // and keeps its own copies in app.js.)
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
-import { wireSignIn } from './signin.js';
+import { wireSignIn, wireSignOut } from './signin.js';
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 export const $ = id => document.getElementById(id);
@@ -51,11 +51,11 @@ export async function openPdf(path, msgId) {
   else window.open(data.signedUrl, '_blank', 'noopener');
 }
 
-// Wires the standard sign-in form (see signin.js) and sign-out link, and calls
+// Wires the standard sign-in form and sign-out link (see signin.js), and calls
 // onUser(user or null) whenever the signed-in person changes.
 export function setupAuth(onUser) {
   wireSignIn(sb, say);
-  $('sign-out').addEventListener('click', () => sb.auth.signOut());
+  wireSignOut(sb);
 
   let current;
   sb.auth.onAuthStateChange((_event, session) => {

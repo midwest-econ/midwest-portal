@@ -2,8 +2,11 @@
 // step 2 checks it, and Supabase signs the person in (each page's auth listener
 // takes it from there). The email has no link on purpose: university mail filters
 // hold messages with sign-in links, or open the links to scan them and use them up.
-// Pages provide #signin-form, #signin-email, #signin-btn, #signin-msg and the code
-// step: #code-step, #signin-code, #code-btn, #code-resend, #code-change.
+// "I already have a code" skips sending, for a code an organizer gave out (sending
+// one would replace it).
+// Pages provide #signin-form, #signin-email, #signin-msg, the send step (#send-row,
+// #signin-btn, #code-have) and the code step (#code-step, #signin-code, #code-btn,
+// #code-resend, #code-change).
 const $ = id => document.getElementById(id);
 const HELP = 'Having trouble signing in? Email mwittconference@utk.edu and we will help.';
 
@@ -13,7 +16,7 @@ export function wireSignIn(sb, say) {
 
   function codeStep(on) {
     $('code-step').hidden = !on;
-    $('signin-btn').hidden = on;
+    $('send-row').hidden = on;
     email.readOnly = on;
     code.value = '';
     if (on) code.focus();
@@ -48,10 +51,31 @@ export function wireSignIn(sb, say) {
     $('code-step').hidden ? send() : verify();
   });
   $('code-resend').addEventListener('click', send);
+  $('code-have').addEventListener('click', () => {
+    if (!email.checkValidity() || !email.value.trim()) return say('signin-msg', 'Enter your email address first.', 'bad');
+    sentTo = email.value.trim();
+    codeStep(true);
+    say('signin-msg', '', 'ok');
+  });
   $('code-change').addEventListener('click', () => {
     sentTo = null;
     codeStep(false);
     say('signin-msg', '', 'ok');
     email.focus();
+  });
+}
+
+// Sign out of this browser's session only. If that fails (a network problem) or
+// hangs (supabase-js can get stuck in a tab left open), drop the stored session
+// and reload the page signed out.
+export function wireSignOut(sb) {
+  $('sign-out').addEventListener('click', async () => {
+    const done = sb.auth.signOut({ scope: 'local' }).then(r => !r.error, () => false);
+    const ok = await Promise.race([done, new Promise(r => setTimeout(() => r(false), 3000))]);
+    if (ok) return;
+    try {
+      for (const k of Object.keys(localStorage)) if (/^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k);
+    } catch {}
+    location.reload();
   });
 }

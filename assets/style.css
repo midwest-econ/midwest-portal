@@ -47,6 +47,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .userbar { background: var(--mist); border-bottom: 1px solid var(--rule); font-family: var(--f-ui); font-size: .86rem; }
 .userbar .wrap { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; padding-block: 9px; }
 .code-input { font-family: var(--f-ui); font-size: 1.4rem; letter-spacing: .25em; max-width: 14ch; }
+.code-show { font-family: var(--f-ui); font-size: 2rem; font-weight: 700; letter-spacing: .2em; color: var(--teal); margin: 0; }
 .linkbtn { background: none; border: 0; padding: 0; color: var(--teal); text-decoration: underline; cursor: pointer; font-family: var(--f-ui); font-size: .86rem; }
 
 /* Page */

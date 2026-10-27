@@ -47,6 +47,8 @@ function pickMeeting(id) {
   firstOf('p-prog').checked = true;
   firstOf('b-prog').checked = true;
   show('s-admin', isAdmin());
+  show('help-panel', isAdmin());
+  if (isAdmin()) loadHelpLog();
   return load();
 }
 
@@ -358,6 +360,49 @@ $('s-form').addEventListener('submit', async e => {
   Object.assign(meeting, data);
   fillSettings();
   say('dash-msg', 'Settings saved.', 'ok');
+});
+
+// ---------------------------------------------------------------- sign-in help
+// Meeting admins get a code for someone whose code emails aren't arriving
+// (supabase/functions/signin-code); they send it on themselves.
+const PORTAL = 'https://portal.midwesttradetheory.org/';
+
+async function loadHelpLog() {
+  const { data } = await sb.from('signin_codes_given').select('*').order('given_at', { ascending: false }).limit(8);
+  $('h-log').innerHTML = data?.length
+    ? data.map(g => `<li>${esc(g.email)} <span class="muted">· ${fmtStamp(g.given_at)} · by ${esc(g.given_by_email)}</span></li>`).join('')
+    : '<li class="muted">None yet.</li>';
+}
+
+$('h-get').addEventListener('click', async () => {
+  const email = $('h-email').value.trim();
+  if (!email || !$('h-email').checkValidity()) return say('dash-msg', 'Enter their email address first.', 'bad');
+  if (!confirm(`Get a sign-in code for ${email}? Any code they already have stops working.`)) return;
+  $('h-get').disabled = true;
+  const { data, error } = await sb.functions.invoke('signin-code', { body: { email } });
+  $('h-get').disabled = false;
+  if (error || !data?.code) {
+    let why = error?.message || 'no code came back';
+    try { why = (await error.context.json()).error || why; } catch {}
+    return say('dash-msg', `Couldn't get a code: ${why}`, 'bad');
+  }
+  const page = PORTAL + $('h-page').value;
+  $('h-code').textContent = data.code;
+  $('h-text').value = `Your sign-in code for the Midwest Trade & Theory Conference portal is ${data.code}.
+
+Go to ${page}, enter ${data.email}, click "I already have a code" and type in the code. It works once and expires in an hour, so please use it soon. (Asking the page to email you a new code would replace this one.)`;
+  show('h-result');
+  show('dash-msg', false);
+  loadHelpLog();
+});
+
+$('h-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('h-text').value);
+    say('dash-msg', 'Message copied. Paste it into an email to them.', 'ok');
+  } catch {
+    $('h-text').select();
+  }
 });
 
 // ---------------------------------------------------------------- start

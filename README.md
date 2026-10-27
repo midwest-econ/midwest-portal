@@ -59,6 +59,7 @@ SQL Editor. Never edit a file that has already been run; add a new numbered one.
 | `001_submissions.sql` | meetings, organizers, submissions, the `papers` PDF bucket, access rules |
 | `002_emails_and_form_trim.sql` | tracks which coauthors were emailed; drops the removed form questions |
 | `003_review.sql` | paper numbers, reviewers, assignments, 1–6 reviews, review instructions, organizer tools |
+| `004_signin_help.sql` | log of sign-in codes given out by meeting admins (Settings → Sign-in help) |
 
 ## Adding an organizer
 
