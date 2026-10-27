@@ -166,7 +166,7 @@ function validate(f, pdf) {
     if (!c.name) return 'Each coauthor needs a name.';
     if (!c.email || !/^\S+@\S+\.\S+$/.test(c.email)) return `Please add a valid email for ${c.name}.`;
   }
-  if (!mine?.pdf_path && !pdf) return 'Please attach your paper as a PDF.';
+  if (!mine?.pdf_path && !pdf) return 'Please attach a PDF: your paper, or an extended abstract if the paper is not ready yet.';
   if (pdf && pdf.type !== 'application/pdf' && !/\.pdf$/i.test(pdf.name)) return 'The paper must be a PDF.';
   if (pdf && pdf.size > MAX_PDF_MB * 1024 * 1024) return `The PDF is over ${MAX_PDF_MB} MB.`;
   return null;
