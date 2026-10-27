@@ -333,6 +333,7 @@ function fillSettings() {
     $('s-date').value = `${p.year}-${p.month}-${p.day}`;
     $('s-time').value = `${p.hour}:${p.minute}`;
   }
+  $('s-decide').value = meeting.decisions_on || '';
   $('s-now').textContent = meeting.submission_deadline ? `Now: ${fmtDeadline(meeting.submission_deadline)}` : 'No deadline set.';
   $('s-trade').value = meeting.review_instructions?.Trade || '';
   $('s-theory').value = meeting.review_instructions?.Theory || '';
@@ -353,6 +354,7 @@ $('s-form').addEventListener('submit', async e => {
       submissions_open: $('s-open').checked,
       // Postgres reads the zone name, so the deadline is exactly this time in Eastern.
       submission_deadline: d ? `${d} ${t}:59 America/New_York` : null,
+      decisions_on: $('s-decide').value || null,
     }).eq('id', meeting.id);
     if (error) return say('dash-msg', `Deadline not saved: ${error.message}`, 'bad');
   }

@@ -60,6 +60,7 @@ SQL Editor. Never edit a file that has already been run; add a new numbered one.
 | `002_emails_and_form_trim.sql` | tracks which coauthors were emailed; drops the removed form questions |
 | `003_review.sql` | paper numbers, reviewers, assignments, 1–6 reviews, review instructions, organizer tools |
 | `004_signin_help.sql` | log of sign-in codes given out by meeting admins (Settings → Sign-in help) |
+| `005_decision_date.sql` | decision notification date for each meeting (Settings; shown under Key dates) |
 
 ## Adding an organizer
 

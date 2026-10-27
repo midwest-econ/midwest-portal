@@ -57,6 +57,8 @@ async function loadMeeting() {
 
   const rows = [['Submission deadline',
     meeting.submission_deadline ? fmtDeadline(meeting.submission_deadline) : 'To be announced']];
+  if (meeting.decisions_on) rows.push(['Decision notification',
+    new Date(meeting.decisions_on + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })]);
   if (meeting.starts_on) rows.push(['Conference', `${fmtDate(meeting.starts_on)} – ${fmtDate(meeting.ends_on)}`]);
   $('dates').replaceChildren(...rows.flatMap(([k, v]) => {
     const dt = document.createElement('dt'); dt.textContent = k;
