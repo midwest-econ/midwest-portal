@@ -164,7 +164,7 @@ function validate(f, pdf) {
                             ['presenter_affiliation', 'affiliation'], ['abstract', 'abstract']]) {
     if (!f[k].value.trim()) return `Please fill in the ${label}.`;
   }
-  if (wordCount(f.abstract.value) > MAX_ABSTRACT_WORDS) return `The abstract is over ${MAX_ABSTRACT_WORDS} words.`;
+  if (wordCount(f.abstract.value) > MAX_ABSTRACT_WORDS) return `The abstract is over ${MAX_ABSTRACT_WORDS} words. If it's an extended abstract, please upload it as the PDF and put a short summary here.`;
   for (const c of readCoauthors()) {
     if (!c.name) return 'Each coauthor needs a name.';
     if (!c.email || !/^\S+@\S+\.\S+$/.test(c.email)) return `Please add a valid email for ${c.name}.`;
