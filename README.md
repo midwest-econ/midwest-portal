@@ -15,7 +15,8 @@ Trade and Theory meetings. The public site stays on Google Sites; its
 
 ```
 index.html                 Submit a Paper (sign-in + submission form)
-organizer.html             Organizer Dashboard (papers, batches to reviewers, reviewers, settings)
+organizer.html             Organizer Dashboard (papers, batches to reviewers, assigning by grid,
+                           reviewers, settings)
 review.html                Review Papers (scientific committee scores assigned papers 1–6)
 assets/config.js           Supabase URL + publishable key (public by design)
 assets/app.js              Submit a Paper logic
@@ -24,8 +25,9 @@ assets/style.css           styles matching the Google Site
 assets/banner.jpg          header photo
 supabase/migrations/       database setup, run in order in the Supabase SQL Editor
 supabase/email-templates/  sign-in emails, pasted into Supabase → Authentication → Emails
-supabase/functions/        Edge Functions: submission-email (author receipts, coauthor notices),
-                           reviewer-email (batch invitations, reminders)
+supabase/functions/        Edge Functions: submission-email (author receipts, coauthor notices,
+                           "10 papers waiting" alert to Trade organizers),
+                           reviewer-email (batch invitations, reminders), signin-code
 ```
 
 ## Security rules
@@ -61,6 +63,7 @@ SQL Editor. Never edit a file that has already been run; add a new numbered one.
 | `003_review.sql` | paper numbers, reviewers, assignments, 1–6 reviews, review instructions, organizer tools |
 | `004_signin_help.sql` | log of sign-in codes given out by meeting admins (Settings → Sign-in help) |
 | `005_decision_date.sql` | decision notification date for each meeting (Settings; shown under Key dates) |
+| `006_batch_alerts.sql` | remembers when Trade organizers were last told another 10 papers are waiting for a reviewer |
 
 ## Adding an organizer
 

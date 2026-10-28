@@ -1,5 +1,5 @@
 // Organizer dashboard: every submission with its reviews, sending batches of
-// papers to reviewers, the reviewer list, and meeting settings. Only signed-in
+// papers to reviewers or assigning them in a grid, the reviewer list, and meeting settings. Only signed-in
 // organizers get data back; the access rules are in the database.
 import { sb, $, show, say, esc, fmtStamp, fmtDeadline, people, openPdf, setupAuth, STATUS } from './common.js';
 
@@ -31,7 +31,7 @@ async function load() {
     assignments: x.assignments.map(a => ({ ...a, review: Array.isArray(a.review) ? a.review[0] || null : a.review })),
   }));
   reviewers = r.data;
-  renderPapers(); renderBatchForm(); renderBatches(); renderReviewers(); fillSettings();
+  renderPapers(); renderBatchForm(); renderBatches(); renderGrid(); renderReviewers(); fillSettings();
 }
 
 function pickMeeting(id) {
@@ -46,6 +46,8 @@ function pickMeeting(id) {
   const firstOf = name => document.querySelector(`[name=${name}][value="${myPrograms.length > 1 && name === 'p-prog' ? '' : myPrograms[0]}"]`);
   firstOf('p-prog').checked = true;
   firstOf('b-prog').checked = true;
+  // The grid is mostly for Theory, where a few reviewers share every paper.
+  document.querySelector(`[name=g-prog][value="${myPrograms.includes('Theory') ? 'Theory' : myPrograms[0]}"]`).checked = true;
   show('s-admin', isAdmin());
   show('help-panel', isAdmin());
   if (isAdmin()) loadHelpLog();
@@ -62,6 +64,8 @@ for (const b of document.querySelectorAll('.tabs [data-tab]')) {
     show('dash-msg', false);
   });
 }
+// organizer.html#batch (the link in the "papers waiting" email) opens that tab.
+document.querySelector(`.tabs [data-tab="${location.hash.slice(1)}"]`)?.click();
 
 // ---------------------------------------------------------------- papers
 $('p-status').append(...Object.entries(STATUS).map(([k, [label]]) => new Option(label, k)));
@@ -162,15 +166,30 @@ const load_ = r => {
   return { n: mine.length, done: mine.filter(a => a.review).length };
 };
 
+const waitingFor = prog => subs.filter(s => s.program === prog && s.status !== 'withdrawn' && !s.assignments.length);
+
 function renderBatchForm() {
   const prog = batchProg();
+  const n = waitingFor(prog).length;
+  $('b-waiting').innerHTML = n
+    ? `<b>${n} ${prog} paper${n > 1 ? 's' : ''}</b> waiting for a reviewer.`
+    : `Every ${prog} paper has a reviewer.`;
+  // Reviewers with no papers yet this meeting come first: usually the next batch goes to one of them.
   const pool = reviewers.filter(r => r.active && r.program === prog);
+  const option = r => {
+    const { n, done } = load_(r);
+    return new Option(`${r.name}${r.affiliation ? `, ${r.affiliation}` : ''}${n ? ` · ${n} papers, ${done} scored` : ''}`, r.id);
+  };
+  const group = (label, rs) => {
+    const g = document.createElement('optgroup');
+    g.label = label;
+    g.append(...rs.map(option));
+    return rs.length ? [g] : [];
+  };
   const keep = $('b-rev').value;
   $('b-rev').replaceChildren(new Option(pool.length ? 'Choose a reviewer…' : `No active ${prog} reviewers yet (add them under Reviewers)`, ''),
-    ...pool.map(r => {
-      const { n } = load_(r);
-      return new Option(`${r.name}${r.affiliation ? `, ${r.affiliation}` : ''}${n ? ` · ${n} papers this meeting` : ''}`, r.id);
-    }));
+    ...group('No papers yet this meeting', pool.filter(r => !load_(r).n)),
+    ...group('Already have papers this meeting', pool.filter(r => load_(r).n)));
   if (pool.some(r => String(r.id) === keep)) $('b-rev').value = keep;
   suggest();
 }
@@ -179,18 +198,19 @@ function suggest() {
   const r = reviewerById(Number($('b-rev').value));
   if (!r) { $('b-list').replaceChildren(); $('b-send').disabled = true; $('b-count').textContent = ''; return; }
   const size = Math.max(1, Number($('b-size').value) || 10);
+  const all = $('b-all').checked;
   const eligible = subs
-    .filter(s => s.program === r.program && s.status !== 'withdrawn' &&
+    .filter(s => s.program === r.program && s.status !== 'withdrawn' && (all || !s.assignments.length) &&
       !s.assignments.some(a => a.reviewer_id === r.id) && !authorEmails(s).includes(r.email))
     .map(s => ({ s, school: sameSchool(s, r) }))
     .sort((x, y) => x.s.assignments.length - y.s.assignments.length || x.s.paper_no - y.s.paper_no);
   let picked = 0;
   $('b-list').innerHTML = eligible.length ? `<div class="pick-list">` + eligible.map(({ s, school }) => {
-    const on = !school && picked < size && ++picked;
+    const on = !school && !s.assignments.length && picked < size && ++picked;
     return `<label class="check"><input type="checkbox" value="${s.id}"${on ? ' checked' : ''}>
-      <span>#${s.paper_no} ${esc(s.title)} <span class="muted small">· ${esc(people(s))} · ${s.assignments.length} assigned</span>
+      <span>#${s.paper_no} ${esc(s.title)} <span class="muted small">· ${esc(people(s))}${s.assignments.length ? ` · ${s.assignments.length} already assigned` : ''}</span>
       ${school ? '<span class="pill warn">same school</span>' : ''}</span></label>`;
-  }).join('') + '</div>' : '<p class="muted small">No unassigned papers left for this reviewer.</p>';
+  }).join('') + '</div>' : `<p class="muted small">${all ? 'No papers left for this reviewer.' : 'Every paper already has a reviewer. To give one a second reviewer, tick "Also list papers that already have a reviewer".'}</p>`;
   countPicked();
 }
 
@@ -203,6 +223,7 @@ function countPicked() {
 for (const el of document.querySelectorAll('[name=b-prog]')) el.addEventListener('change', renderBatchForm);
 $('b-rev').addEventListener('change', suggest);
 $('b-size').addEventListener('change', suggest);
+$('b-all').addEventListener('change', suggest);
 $('b-list').addEventListener('change', countPicked);
 
 $('b-send').addEventListener('click', async () => {
@@ -257,6 +278,130 @@ $('b-table').addEventListener('click', async e => {
   b.disabled = true;
   if (await emailReviewer(r, 'remind')) { await load(); say('dash-msg', `Reminder sent to ${r.name}.`, 'ok'); }
   else b.disabled = false;
+});
+
+// ---------------------------------------------------------------- grid
+// Papers × reviewers for one program. Ticking and unticking only changes gridAdd and
+// gridDrop ("paperId:reviewerId" keys); the database changes when Save is pressed.
+const gridAdd = new Set(), gridDrop = new Set();
+const gridProg = () => document.querySelector('[name=g-prog]:checked').value;
+const gridKey = (s, r) => `${s.id}:${r.id}`;
+
+function gridData() {
+  const prog = gridProg();
+  const assigned = new Map(subs.flatMap(s => s.assignments.map(a => [`${s.id}:${a.reviewer_id}`, a])));
+  // Edits the data has caught up with (e.g. a batch sent meanwhile) are dropped.
+  for (const k of gridAdd) if (assigned.has(k)) gridAdd.delete(k);
+  for (const k of gridDrop) if (!assigned.has(k)) gridDrop.delete(k);
+  return {
+    assigned,
+    papers: subs.filter(s => s.program === prog && s.status !== 'withdrawn'),
+    // Inactive reviewers stay listed while they hold papers, so those show.
+    revs: reviewers.filter(r => r.program === prog && (r.active || subs.some(s => s.assignments.some(a => a.reviewer_id === r.id)))),
+  };
+}
+const ticked = (assigned, k) => gridAdd.has(k) || (assigned.has(k) && !gridDrop.has(k));
+
+function renderGrid() {
+  const { assigned, papers, revs } = gridData();
+  const prog = gridProg();
+  if (!papers.length || !revs.length) {
+    $('g-table').innerHTML = `<tbody><tr><td class="muted">${!papers.length ? `No ${prog} papers yet.` : `No ${prog} reviewers yet. Add them under Reviewers.`}</td></tr></tbody>`;
+    return gridCount();
+  }
+  const cell = (s, r) => {
+    if (authorEmails(s).includes(r.email)) return '<td class="cell muted" title="Their own paper">–</td>';
+    const k = gridKey(s, r), a = assigned.get(k), on = ticked(assigned, k);
+    if (a?.review) return `<td class="cell scored" title="Scored ${a.review.score}">${a.review.score}</td>`;
+    const school = sameSchool(s, r);
+    return `<td class="cell${school ? ' school' : ''}${on !== !!a ? ' changed' : ''}"${school ? ' title="Same school as the reviewer"' : ''}>
+      <input type="checkbox" data-k="${k}" aria-label="Paper ${s.paper_no} to ${esc(r.name)}"${on ? ' checked' : ''}></td>`;
+  };
+  $('g-table').innerHTML = `<thead><tr><th>#</th><th>Paper</th>` +
+    revs.map(r => `<th class="rev">${esc(r.name)}${r.active ? '' : ' <span class="muted">(inactive)</span>'}
+      <div class="small muted" data-colcount="${r.id}"></div>${r.active ? `<button type="button" class="linkbtn" data-col="${r.id}">All</button>` : ''}</th>`).join('') +
+    `<th>Reviewers</th></tr></thead><tbody>` +
+    papers.map(s => `<tr><td>${s.paper_no}</td>
+      <td><b>${esc(s.title)}</b><div class="small muted">${esc(people(s))}</div></td>
+      ${revs.map(r => cell(s, r)).join('')}
+      <td class="nowrap" data-rowcount="${s.id}"></td></tr>`).join('') + '</tbody>';
+  gridCount();
+}
+
+// Per-reviewer and per-paper counts, and the pending changes, after every tick.
+function gridCount() {
+  const { assigned, papers, revs } = gridData();
+  for (const r of revs) {
+    const el = $('g-table').querySelector(`[data-colcount="${r.id}"]`);
+    if (el) el.textContent = `${papers.filter(s => ticked(assigned, gridKey(s, r))).length} papers`;
+  }
+  for (const s of papers) {
+    const el = $('g-table').querySelector(`[data-rowcount="${s.id}"]`);
+    if (el) el.textContent = revs.filter(r => ticked(assigned, gridKey(s, r))).length;
+  }
+  const n = gridAdd.size + gridDrop.size;
+  $('g-count').textContent = n
+    ? [gridAdd.size && `${gridAdd.size} to assign`, gridDrop.size && `${gridDrop.size} to take back`].filter(Boolean).join(', ') + ' (not saved yet)'
+    : '';
+  $('g-save').disabled = $('g-undo').disabled = !n;
+}
+
+$('g-table').addEventListener('change', e => {
+  const box = e.target.closest('[data-k]');
+  if (!box) return;
+  const { assigned } = gridData();
+  const k = box.dataset.k;
+  if (assigned.has(k)) box.checked ? gridDrop.delete(k) : gridDrop.add(k);
+  else box.checked ? gridAdd.add(k) : gridAdd.delete(k);
+  box.closest('td').classList.toggle('changed', box.checked !== assigned.has(k));
+  gridCount();
+});
+
+$('g-table').addEventListener('click', e => {
+  const b = e.target.closest('[data-col]');
+  if (!b) return;
+  const r = reviewerById(Number(b.dataset.col));
+  const { assigned, papers } = gridData();
+  for (const s of papers) {
+    const k = gridKey(s, r);
+    if (authorEmails(s).includes(r.email) || sameSchool(s, r)) continue;
+    gridDrop.delete(k);
+    if (!assigned.has(k)) gridAdd.add(k);
+  }
+  renderGrid();
+});
+
+for (const el of document.querySelectorAll('[name=g-prog]')) el.addEventListener('change', renderGrid);
+$('g-undo').addEventListener('click', () => { gridAdd.clear(); gridDrop.clear(); renderGrid(); });
+window.addEventListener('beforeunload', e => { if (gridAdd.size || gridDrop.size) e.preventDefault(); });
+
+$('g-save').addEventListener('click', async () => {
+  const { assigned } = gridData();
+  const adds = [...gridAdd].map(k => k.split(':').map(Number));
+  const drops = [...gridDrop].map(k => assigned.get(k)).filter(a => a && !a.review);
+  const emailing = $('g-email').checked;
+  const newFor = [...new Set(adds.map(([, rid]) => rid))].map(reviewerById);
+  const what = [adds.length && `Assign ${adds.length} paper${adds.length > 1 ? 's' : ''}`,
+    drops.length && `${adds.length ? 'take' : 'Take'} back ${drops.length}`].filter(Boolean).join(' and ');
+  const mail = emailing && newFor.length ? ` and email ${newFor.map(r => r.name).join(', ')}` : '';
+  if (!confirm(`${what}${mail}?${drops.length ? ' Reviewers are not told when a paper is taken back.' : ''}`)) return;
+
+  $('g-save').disabled = true;
+  if (drops.length) {
+    const { error } = await sb.from('assignments').delete().in('id', drops.map(a => a.id));
+    if (error) { $('g-save').disabled = false; return say('dash-msg', `Nothing was changed: ${error.message}`, 'bad'); }
+  }
+  if (adds.length) {
+    const due_on = $('g-due').value || null;
+    const { error } = await sb.from('assignments').insert(adds.map(([submission_id, reviewer_id]) => ({ submission_id, reviewer_id, due_on })));
+    if (error) { await load(); return say('dash-msg', `${drops.length ? 'Papers were taken back, but n' : 'N'}o new papers were assigned: ${error.message}`, 'bad'); }
+  }
+  gridAdd.clear(); gridDrop.clear();
+  const failed = [];
+  if (emailing) for (const r of newFor) if (!await emailReviewer(r, 'invite')) failed.push(r.name);
+  await load();
+  if (failed.length) return say('dash-msg', `Saved, but the email to ${failed.join(', ')} didn't go out. Use "Email again" under Send a batch → Batches sent.`, 'bad');
+  say('dash-msg', `Saved${emailing && newFor.length ? ` and emailed ${newFor.length} reviewer${newFor.length > 1 ? 's' : ''}` : ''}.`, 'ok');
 });
 
 // ---------------------------------------------------------------- reviewers

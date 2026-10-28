@@ -1,6 +1,7 @@
 // submission-email: called by the portal right after an author saves a submission.
 // Sends the author a receipt ("received" on first submit, "updated" on edits) and
-// tells each newly listed coauthor, once, that they're on the paper.
+// tells each newly listed coauthor, once, that they're on the paper. A new Trade paper
+// that makes another 10 waiting for a reviewer also emails the Trade organizers.
 //
 // It reads the submission from the database itself (never trusts the request body
 // beyond the id) and only acts on the caller's own submission, saved in the last
@@ -71,7 +72,7 @@ function summary(rows: [string, string][]) {
 }
 
 // ---------------------------------------------------------------- sending
-async function send(msg: { to: string; subject: string; html: string; text: string }, key?: string) {
+async function send(msg: { to: string | string[]; subject: string; html: string; text: string }, key?: string) {
   const headers: Record<string, string> = {
     'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
     'Content-Type': 'application/json',
@@ -172,5 +173,54 @@ Deno.serve(async req => {
     await admin.from('submissions').update({ notified_coauthors: [...told] }).eq('id', s.id);
   }
 
+  // 3. A new paper may make another 10 waiting for a reviewer: tell the organizers.
+  if (first && ALERT_PROGRAMS.includes(s.program)) sent += await batchAlert(m, s.program);
+
   return reply(200, { sent });
 });
+
+// ---------------------------------------------------------------- batch alert
+// Each time the number of papers with no reviewer reaches another multiple of 10
+// (10, 20, ...), every organizer of the program gets one email. batch_alerts
+// (006_batch_alerts.sql) holds the last multiple reported; it comes back down as
+// papers are assigned, so the next 10 to arrive are reported again.
+const ALERT_PROGRAMS = ['Trade'];
+const BATCH = 10;
+
+async function batchAlert(m: any, program: string) {
+  const { data: subs, error } = await admin.from('submissions')
+    .select('id, assignments(id)').eq('meeting_id', m.id).eq('program', program).neq('status', 'withdrawn');
+  if (error) { console.error('batchAlert', error.message); return 0; }
+  const waiting = (subs || []).filter(x => !x.assignments?.length).length;
+  const tens = Math.floor(waiting / BATCH);
+
+  const key = { meeting_id: m.id, program };
+  await admin.from('batch_alerts').upsert(key, { onConflict: 'meeting_id,program', ignoreDuplicates: true });
+  await admin.from('batch_alerts').update({ alerted_tens: tens }).match(key).gt('alerted_tens', tens);
+  // Only one of two simultaneous calls can raise it, so only one emails.
+  const { data: won } = await admin.from('batch_alerts').update({ alerted_tens: tens })
+    .match(key).lt('alerted_tens', tens).select();
+  if (!won?.length) return 0;
+
+  const { data: roles } = await admin.from('organizers').select('user_id, meeting_id').eq('program', program);
+  const ids = [...new Set((roles || []).filter(o => !o.meeting_id || o.meeting_id === m.id).map(o => o.user_id))];
+  const emails = (await Promise.all(ids.map(id => admin.auth.admin.getUserById(id))))
+    .map(r => r.data?.user?.email).filter(Boolean) as string[];
+  if (!emails.length) return 0;
+
+  const page = PORTAL + 'organizer.html#batch';
+  const lead = `${waiting} ${program} papers for the ${m.name} meetings are waiting for a reviewer.`;
+  const how = `Open the organizer page and choose "Send a batch": it lists the papers with no reviewer, oldest first, with the first ${BATCH} ticked. This email goes to every ${program} organizer, so someone may already be on it.`;
+  const ok = await send({
+    to: emails,
+    subject: `${waiting} ${program} papers are waiting for a reviewer`,
+    html: layout(`${waiting} ${esc(program)} papers are waiting`,
+      p(esc(lead)) +
+      p(`<a href="${page}" style="display:inline-block;background:#226e93;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:4px;font-family:Arial,Helvetica,sans-serif;font-size:15px;">Send a batch</a>`) +
+      p(esc(how), true)),
+    text: [lead, '', `Organizer page: ${page}`, how].join('\n'),
+  });
+  // Unsent: let the next new paper try again.
+  if (!ok) await admin.from('batch_alerts').update({ alerted_tens: tens - 1 }).match(key).eq('alerted_tens', tens);
+  return ok ? 1 : 0;
+}

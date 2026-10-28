@@ -71,6 +71,7 @@
       <div class="tabs" role="tablist">
         <button type="button" role="tab" data-tab="papers" class="on">Papers</button>
         <button type="button" role="tab" data-tab="batch">Send a batch</button>
+        <button type="button" role="tab" data-tab="grid">Assign by grid</button>
         <button type="button" role="tab" data-tab="reviewers">Reviewers</button>
         <button type="button" role="tab" data-tab="settings">Settings</button>
       </div>
@@ -101,7 +102,8 @@
     <div id="tab-batch" class="stack" hidden>
       <div class="panel stack">
         <h3>Send a batch to a reviewer</h3>
-        <p class="muted small">Papers with the fewest reviews come first. Papers the reviewer wrote or coauthored are left out, and papers from the reviewer's own school are flagged and not pre-ticked.</p>
+        <p class="muted small">For giving each new reviewer the next papers that don't have a reviewer yet, oldest first. Papers the reviewer wrote or coauthored are left out, and papers from the reviewer's own school are flagged and not pre-ticked.</p>
+        <p class="waiting" id="b-waiting"></p>
         <div class="toolbar">
           <div class="seg" role="radiogroup" aria-label="Program">
             <label data-prog="Trade"><input type="radio" name="b-prog" value="Trade" checked> Trade</label>
@@ -111,6 +113,7 @@
           <div class="field"><label for="b-size">Papers</label><input id="b-size" type="number" min="1" max="40" value="10"></div>
           <div class="field"><label for="b-due">Scores due</label><input id="b-due" type="date"></div>
         </div>
+        <label class="check small"><input type="checkbox" id="b-all"> Also list papers that already have a reviewer (for a second opinion)</label>
         <div id="b-list" class="stack"></div>
         <div class="btnrow">
           <button type="button" class="btn" id="b-send" disabled>Assign and email the reviewer</button>
@@ -124,6 +127,28 @@
     </div>
 
     <!-- Reviewers -->
+    <!-- Assign by grid -->
+    <div id="tab-grid" class="stack" hidden>
+      <div class="panel stack">
+        <h3>Assign by grid</h3>
+        <p class="muted small">For a few reviewers sharing all the papers, usually once submissions have closed. Tick a box to give that reviewer the paper, or untick it to take it back. A number is a score already given, which stays. "All" in a column ticks every paper for that reviewer except ones from their own school, which are flagged. A reviewer's own papers have no box. Nothing changes until you save.</p>
+        <div class="toolbar">
+          <div class="seg" role="radiogroup" aria-label="Program">
+            <label data-prog="Trade"><input type="radio" name="g-prog" value="Trade"> Trade</label>
+            <label data-prog="Theory"><input type="radio" name="g-prog" value="Theory" checked> Theory</label>
+          </div>
+          <div class="field"><label for="g-due">Scores due</label><input id="g-due" type="date"></div>
+        </div>
+        <div class="tbl-wrap"><table class="tbl grid-tbl" id="g-table"></table></div>
+        <label class="check small"><input type="checkbox" id="g-email" checked> Email each reviewer who gets new papers (one email each, with the number of new papers)</label>
+        <div class="btnrow">
+          <button type="button" class="btn" id="g-save" disabled>Save changes</button>
+          <button type="button" class="btn ghost sm" id="g-undo" disabled>Undo changes</button>
+          <span class="hint" id="g-count"></span>
+        </div>
+      </div>
+    </div>
+
     <div id="tab-reviewers" class="stack" hidden>
       <div class="tbl-wrap"><table class="tbl" id="r-table"></table></div>
       <div class="panel stack">
