@@ -43,13 +43,16 @@ function isOpen() {
 }
 
 // ---------------------------------------------------------------- meeting
+// The demo meeting (007_demo_meeting.sql) is only reached by name: ?meeting=demo.
 async function loadMeeting() {
-  const { data, error } = await sb.from('meetings')
-    .select('*').eq('submissions_open', true)
-    .order('starts_on', { ascending: true }).limit(1);
+  const named = new URLSearchParams(location.search).get('meeting');
+  let q = sb.from('meetings').select('*').eq('submissions_open', true);
+  q = named ? q.eq('id', named) : q.eq('demo', false);
+  const { data, error } = await q.order('starts_on', { ascending: true }).limit(1);
   if (error) throw error;
   meeting = data[0] || null;
   if (!meeting) return;
+  if (meeting.demo) say('demo-note', 'This is the demo meeting, for trying out the portal. Papers here are test papers, not real submissions. Emails are really sent (marked [Demo]), so give coauthors test addresses.', 'warn');
 
   const days = meeting.starts_on && meeting.ends_on
     ? ` · ${fmtDate(meeting.starts_on).replace(/, \d{4}$/, '')}–${fmtDate(meeting.ends_on)}` : '';

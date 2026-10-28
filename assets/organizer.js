@@ -39,6 +39,7 @@ function pickMeeting(id) {
   myPrograms = ['Trade', 'Theory'].filter(p => roles.some(r => r.program === p && (!r.meeting_id || r.meeting_id === meeting.id)));
   const days = meeting.starts_on ? ` · ${new Date(meeting.starts_on + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}–${new Date(meeting.ends_on + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : '';
   $('meeting-line').textContent = `${meeting.name} meetings · ${myPrograms.join(' & ')} program${days}`;
+  show('demo-note', meeting.demo);
 
   // Show only this organizer's program(s).
   for (const el of document.querySelectorAll('[data-prog]')) el.hidden = !myPrograms.includes(el.dataset.prog);
@@ -568,12 +569,15 @@ async function onUser(user) {
   const { data, error } = await sb.from('meetings').select('*').order('starts_on', { ascending: false });
   if (error) return say('notice', `Couldn't load meetings: ${error.message}`, 'bad');
   // Only the meetings this person organizes (all of them for an unscoped role).
-  meetings = data.filter(m => roles.some(r => !r.meeting_id || r.meeting_id === m.id));
+  // Real meetings first; the demo meeting (if any) last.
+  meetings = data.filter(m => roles.some(r => !r.meeting_id || r.meeting_id === m.id))
+    .sort((a, b) => a.demo - b.demo);
   if (!meetings.length) return say('notice', 'Your organizer role is for a meeting that no longer exists. Write to mwittconference@utk.edu.', 'warn');
   $('meeting-sel').replaceChildren(...meetings.map(m => new Option(m.name, m.id)));
   show('meeting-pick', meetings.length > 1);
   show('dash');
-  const current = meetings.find(m => m.submissions_open) || meetings[0];
+  const named = meetings.find(m => m.id === new URLSearchParams(location.search).get('meeting'));
+  const current = named || meetings.find(m => m.submissions_open && !m.demo) || meetings[0];
   $('meeting-sel').value = current.id;
   await pickMeeting(current.id);
 }

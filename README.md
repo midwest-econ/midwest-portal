@@ -64,6 +64,35 @@ SQL Editor. Never edit a file that has already been run; add a new numbered one.
 | `004_signin_help.sql` | log of sign-in codes given out by meeting admins (Settings → Sign-in help) |
 | `005_decision_date.sql` | decision notification date for each meeting (Settings; shown under Key dates) |
 | `006_batch_alerts.sql` | remembers when Trade organizers were last told another 10 papers are waiting for a reviewer |
+| `007_demo_meeting.sql` | a demo meeting for trying the portal with test papers |
+
+## The demo meeting
+
+For showing the portal to colleagues with test papers, kept apart from the real
+meetings. Submit test papers at https://portal.midwesttradetheory.org/?meeting=demo
+(the plain address never shows it). Organizers choose "Demo" from the Meeting menu,
+or open `organizer.html?meeting=demo`. Emails are really sent, with "[Demo]" at the
+start of the subject, so use test addresses: Gmail's `name+anything@gmail.com` reaches
+`name@gmail.com` and counts as a different author. The reviewer list is shared with
+the real meetings, so give demo papers only to test reviewers.
+
+To let someone try the organizer page on the demo meeting only (they sign in once first):
+
+```sql
+insert into public.organizers (user_id, program, meeting_id, meeting_admin)
+select id, 'Trade', 'demo', true from auth.users where email = 'name@example.edu';
+```
+
+Deleting the demo meeting: first delete the `demo` folder in Storage → `papers`, then
+
+```sql
+delete from public.organizers  where meeting_id = 'demo';
+delete from public.submissions where meeting_id = 'demo';   -- their assignments and reviews go too
+delete from public.meetings    where id = 'demo';
+```
+
+and remove the test accounts in Authentication → Users and test reviewers in the
+`reviewers` table.
 
 ## Adding an organizer
 

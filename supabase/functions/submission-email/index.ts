@@ -108,6 +108,8 @@ Deno.serve(async req => {
   if (Date.now() - new Date(s.updated_at).getTime() > FRESH_MS) return reply(200, { sent: 0 });
 
   const m = s.meeting;
+  const tag = m.demo ? '[Demo] ' : '';
+  const portal = m.demo ? `${PORTAL}?meeting=${m.id}` : PORTAL;
   const first = s.created_at === s.updated_at;   // only inserts leave these equal
   const where = [m.location || m.host,
     m.starts_on ? `${fmtDay(m.starts_on).replace(/, \d{4}$/, '')}–${fmtDay(m.ends_on)}` : '']
@@ -137,14 +139,14 @@ Deno.serve(async req => {
   const coNote = coauthors.length && first ? 'We\'re letting your coauthors know they are listed on the paper.' : '';
   if (await send({
     to: user.email,
-    subject: `${heading}: ${s.title}`,
+    subject: `${tag}${heading}: ${s.title}`,
     html: layout(heading,
       p(esc(lead)) +
       summary(rows.map(([k, v]) => [k, esc(v).replace(/\n/g, '<br>')])) +
-      p(`${esc(editNote)} <a href="${PORTAL}" style="color:#226e93;">${PORTAL.replace(/^https:\/\/|\/$/g, '')}</a>.`, true) +
+      p(`${esc(editNote)} <a href="${portal}" style="color:#226e93;">${portal.replace(/^https:\/\/|\/$/g, '')}</a>.`, true) +
       (coNote ? p(coNote, true) : '')),
     text: [lead, '', ...rows.map(([k, v]) => `${k}: ${v.replace(/\n/g, '; ')}`), '',
-      `${editNote} ${PORTAL}`, ...(coNote ? ['', coNote] : []),
+      `${editNote} ${portal}`, ...(coNote ? ['', coNote] : []),
       '', `Questions? Reply to this email or write to ${REPLY_TO}.`].join('\n'),
   })) sent++;
 
@@ -161,7 +163,7 @@ Deno.serve(async req => {
       p(`You don't need to do anything. The presenting author submits and edits the paper. If something isn't right, please contact ${esc(s.presenter_name)} at <a href="mailto:${esc(user.email)}" style="color:#226e93;">${esc(user.email)}</a>.`, true);
     const ok = await send({
       to: c.email.trim(),
-      subject: `You're listed as a coauthor: ${s.title}`,
+      subject: `${tag}You're listed as a coauthor: ${s.title}`,
       html: layout('You\'re listed as a coauthor', body),
       text: `${presenter} has submitted "${s.title}" to the ${s.program} program of ${meetingText} and listed you, ${c.name}, as a coauthor.\n\n` +
         `You don't need to do anything. The presenting author submits and edits the paper. If something isn't right, please contact ${s.presenter_name} at ${user.email}.\n\n` +
@@ -208,12 +210,12 @@ async function batchAlert(m: any, program: string) {
     .map(r => r.data?.user?.email).filter(Boolean) as string[];
   if (!emails.length) return 0;
 
-  const page = PORTAL + 'organizer.html#batch';
+  const page = PORTAL + 'organizer.html' + (m.demo ? `?meeting=${m.id}` : '') + '#batch';
   const lead = `${waiting} ${program} papers for the ${m.name} meetings are waiting for a reviewer.`;
   const how = `Open the organizer page and choose "Send a batch": it lists the papers with no reviewer, oldest first, with the first ${BATCH} ticked. This email goes to every ${program} organizer, so someone may already be on it.`;
   const ok = await send({
     to: emails,
-    subject: `${waiting} ${program} papers are waiting for a reviewer`,
+    subject: `${m.demo ? '[Demo] ' : ''}${waiting} ${program} papers are waiting for a reviewer`,
     html: layout(`${waiting} ${esc(program)} papers are waiting`,
       p(esc(lead)) +
       p(`<a href="${page}" style="display:inline-block;background:#226e93;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:4px;font-family:Arial,Helvetica,sans-serif;font-size:15px;">Send a batch</a>`) +

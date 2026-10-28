@@ -113,9 +113,9 @@ Deno.serve(async req => {
     headers: { 'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: FROM, reply_to: REPLY_TO, to: r.email, text, html,
-      subject: mode === 'remind'
+      subject: (m.demo ? '[Demo] ' : '') + (mode === 'remind'
         ? `Reminder: ${n} ${r.program} paper${n > 1 ? 's' : ''} to score for the ${m.name} meetings`
-        : `${papers} to review for the ${m.name} meetings`,
+        : `${papers} to review for the ${m.name} meetings`),
     }),
   });
   if (!res.ok) {
