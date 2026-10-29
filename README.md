@@ -16,7 +16,7 @@ Trade and Theory meetings. The public site stays on Google Sites; its
 ```
 index.html                 Submit a Paper (sign-in + submission form)
 organizer.html             Organizer Dashboard (papers, batches to reviewers, assigning by grid,
-                           reviewers, settings)
+                           decisions and decision emails, reviewers, settings)
 review.html                Review Papers (scientific committee scores assigned papers 1–6)
 assets/config.js           Supabase URL + publishable key (public by design)
 assets/app.js              Submit a Paper logic
@@ -27,7 +27,8 @@ supabase/migrations/       database setup, run in order in the Supabase SQL Edit
 supabase/email-templates/  sign-in emails, pasted into Supabase → Authentication → Emails
 supabase/functions/        Edge Functions: submission-email (author receipts, coauthor notices,
                            "10 papers waiting" alert to Trade organizers),
-                           reviewer-email (batch invitations, reminders), signin-code
+                           reviewer-email (batch invitations, reminders), decision-email
+                           (Accept/Decline emails, coauthors copied), signin-code
 ```
 
 ## Security rules
@@ -67,6 +68,7 @@ SQL Editor. Never edit a file that has already been run; add a new numbered one.
 | `007_demo_meeting.sql` | a demo meeting for trying the portal with test papers |
 | `008_demo_reviewers.sql` | test reviewers for the demo meeting, kept apart from the real ones |
 | `009_paper_numbers_by_program.sql` | paper numbers count within each program: IT1, IT2, … (Trade) and ET1, ET2, … (Theory) |
+| `010_decisions.sql` | Accept/Decline per paper, hidden from authors until the decision emails go out; each program's email wording |
 
 ## The demo meeting
 

@@ -23,7 +23,7 @@ const sameSchool = (s, r) => !!r.affiliation && affiliations(s).some(a => a.incl
 async function load() {
   const [s, r] = await Promise.all([
     sb.from('submissions')
-      .select('*, assignments(id, reviewer_id, invited_at, created_at, review:reviews(score, comments, updated_at))')
+      .select('*, assignments(id, reviewer_id, invited_at, created_at, review:reviews(score, comments, updated_at)), decision:decisions(decision, decided_at, sent_at)')
       .eq('meeting_id', meeting.id).order('program', { ascending: false }).order('paper_no'),   // Trade first
     sb.from('reviewers').select('*').order('name'),
   ]);
@@ -31,9 +31,10 @@ async function load() {
   subs = s.data.map(x => ({
     ...x,
     assignments: x.assignments.map(a => ({ ...a, review: Array.isArray(a.review) ? a.review[0] || null : a.review })),
+    decision: Array.isArray(x.decision) ? x.decision[0] || null : x.decision,
   }));
   reviewers = r.data;
-  renderPapers(); renderBatchForm(); renderBatches(); renderGrid(); renderReviewers(); fillSettings();
+  renderPapers(); renderBatchForm(); renderBatches(); renderGrid(); renderDecisions(); fillDecisionEmails(); renderReviewers(); fillSettings();
 }
 
 function pickMeeting(id) {
@@ -49,6 +50,7 @@ function pickMeeting(id) {
   const firstOf = name => document.querySelector(`[name=${name}][value="${myPrograms.length > 1 && name === 'p-prog' ? '' : myPrograms[0]}"]`);
   firstOf('p-prog').checked = true;
   firstOf('b-prog').checked = true;
+  firstOf('d-prog').checked = true;
   // The grid is mostly for Theory, where a few reviewers share every paper.
   document.querySelector(`[name=g-prog][value="${myPrograms.includes('Theory') ? 'Theory' : myPrograms[0]}"]`).checked = true;
   show('s-admin', isAdmin());
@@ -91,8 +93,11 @@ function renderPapers() {
   const split = myPrograms.length > 1 ? ` (${myPrograms.map(p => `${byProg(p)} ${p}`).join(', ')})` : '';
   $('p-summary').textContent = `${subs.length} ${myPrograms.join(' & ')} submissions${split} · ${scored} with at least one score · showing ${list.length}`;
 
+  // Accepted / Not accepted come only from sending decisions (Decisions tab).
   const statusSel = s => `<select data-status="${s.id}" aria-label="Status for paper ${paperId(s)}">` +
-    Object.entries(STATUS).map(([k, [label]]) => `<option value="${k}"${k === s.status ? ' selected' : ''}>${label}</option>`).join('') + '</select>';
+    [...new Set([s.status, ...(s.decision?.sent_at ? [] : ['submitted', 'under_review']), 'withdrawn'])]
+      .map(k => `<option value="${k}"${k === s.status ? ' selected' : ''}>${STATUS[k]?.[0] || k}</option>`).join('') + '</select>' +
+    (s.decision && !s.decision.sent_at ? `<div class="small muted">Decision: ${DECISION[s.decision.decision]} (not emailed yet)</div>` : '');
   const reviewCell = s => {
     const done = reviewsOf(s), n = s.assignments.length;
     if (!n) return '<span class="muted">none</span>';
@@ -144,13 +149,14 @@ $('p-table').addEventListener('change', async e => {
 $('p-csv').addEventListener('click', () => {
   const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const head = ['Paper', 'Program', 'Title', 'Presenter', 'Affiliation', 'Email', 'Coauthors', 'Coauthor emails',
-    'Abstract', 'Submitted', 'Last edited', 'Status', 'Assigned', 'Scored', 'Mean score', 'Scores and comments'];
+    'Abstract', 'Submitted', 'Last edited', 'Status', 'Decision', 'Assigned', 'Scored', 'Mean score', 'Scores and comments'];
   const rows = subs.map(s => {
     const done = reviewsOf(s);
     return [paperId(s), s.program, s.title, s.presenter_name, s.presenter_affiliation, s.presenter_email,
       (s.coauthors || []).map(c => c.affiliation ? `${c.name} (${c.affiliation})` : c.name).join('; '),
       (s.coauthors || []).map(c => c.email).join('; '),
       s.abstract, s.created_at, s.updated_at, STATUS[s.status]?.[0] || s.status,
+      s.decision ? `${DECISION[s.decision.decision]}${s.decision.sent_at ? ' (emailed)' : ''}` : '',
       s.assignments.length, done.length, mean(done.map(a => a.review.score))?.toFixed(2) ?? '',
       done.map(a => `${reviewerById(a.reviewer_id)?.name}: ${a.review.score}${a.review.comments ? ` (${a.review.comments})` : ''}`).join(' | ')];
   });
@@ -401,6 +407,118 @@ $('g-save').addEventListener('click', async () => {
   await load();
   if (failed.length) return say('dash-msg', `Saved, but the email to ${failed.join(', ')} didn't go out. Use "Email again" under Send a batch → Batches sent.`, 'bad');
   say('dash-msg', `Saved${emailing && newFor.length ? ` and emailed ${newFor.length} reviewer${newFor.length > 1 ? 's' : ''}` : ''}.`, 'ok');
+});
+
+// ---------------------------------------------------------------- decisions
+// Decisions (010_decisions.sql) stay hidden from authors until decision-email sends them,
+// which also sets the paper's status to accepted or declined.
+const DECISION = { accepted: 'Accept', declined: 'Decline' };
+const meanOf = s => mean(reviewsOf(s).map(a => a.review.score));
+const dProg = () => document.querySelector('[name=d-prog]:checked')?.value;
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+function renderDecisions() {
+  const prog = dProg();
+  if (!prog) return;
+  const papers = subs.filter(s => s.program === prog && s.status !== 'withdrawn')
+    .sort((x, y) => (meanOf(y) ?? -1) - (meanOf(x) ?? -1) || x.paper_no - y.paper_no);
+  const count = d => papers.filter(s => s.decision?.decision === d).length;
+  const undecided = papers.filter(s => !s.decision).length;
+  const sent = papers.filter(s => s.decision?.sent_at).length;
+  $('d-summary').innerHTML = papers.length
+    ? `<b>${plural(papers.length, `${prog} paper`)}</b> · ${count('accepted')} accept · ${count('declined')} decline · ${undecided} undecided · ${sent} emailed`
+    : `No ${prog} papers yet.`;
+
+  const choice = s => s.decision?.sent_at
+    ? `<span class="pill ${s.decision.decision === 'accepted' ? 'ok' : 'bad'}">${DECISION[s.decision.decision]}</span> <span class="small muted">emailed ${fmtStamp(s.decision.sent_at)}</span>`
+    : `<select data-decide="${s.id}" aria-label="Decision for paper ${paperId(s)}">` +
+      [['', '—'], ['accepted', 'Accept'], ['declined', 'Decline']]
+        .map(([v, label]) => `<option value="${v}"${(s.decision?.decision || '') === v ? ' selected' : ''}>${label}</option>`).join('') + '</select>';
+  $('d-table').innerHTML = papers.length
+    ? `<thead><tr><th>#</th><th>Paper</th><th>Scores</th><th>Mean</th><th>Decision</th></tr></thead><tbody>` +
+      papers.map(s => {
+        const scores = reviewsOf(s).map(a => a.review.score), avg = meanOf(s);
+        return `<tr><td>${paperId(s)}</td>
+          <td><b>${esc(s.title)}</b><div class="small muted">${esc(people(s))} · ${esc(s.presenter_affiliation)}</div></td>
+          <td class="nowrap">${scores.length ? scores.join(', ') : '<span class="muted">none</span>'}</td>
+          <td>${avg == null ? '' : `<b>${avg.toFixed(1)}</b>`}</td>
+          <td class="nowrap">${choice(s)}</td></tr>`;
+      }).join('') + '</tbody>'
+    : '';
+
+  const ready = papers.filter(s => s.decision && !s.decision.sent_at);
+  const acc = ready.filter(s => s.decision.decision === 'accepted').length;
+  $('d-ready').innerHTML = ready.length
+    ? `<b>${plural(ready.length, 'decision email')}</b> ready to send (${acc} accept, ${ready.length - acc} decline).` +
+      (undecided ? ` ${plural(undecided, 'paper')} with no decision won't be emailed.` : '')
+    : sent ? 'Every decided paper has been emailed.' : 'No decisions yet.';
+  $('d-send').disabled = !ready.length;
+  $('d-send').textContent = ready.length ? `Send ${plural(ready.length, 'decision email')}` : 'Send the decision emails';
+}
+
+$('d-table').addEventListener('change', async e => {
+  const sel = e.target.closest('[data-decide]');
+  if (!sel) return;
+  const s = subs.find(x => x.id === Number(sel.dataset.decide));
+  const v = sel.value;
+  // Not upsert: that would also rewrite submission_id, which organizers may not update.
+  const { error } = !v ? await sb.from('decisions').delete().eq('submission_id', s.id)
+    : s.decision ? await sb.from('decisions').update({ decision: v }).eq('submission_id', s.id)
+    : await sb.from('decisions').insert({ submission_id: s.id, decision: v });
+  if (error) { sel.value = s.decision?.decision || ''; return say('dash-msg', `Decision not saved: ${error.message}`, 'bad'); }
+  s.decision = v ? { decision: v, decided_at: new Date().toISOString(), sent_at: null } : null;
+  show('dash-msg', false);
+  renderDecisions(); renderPapers();
+});
+
+function fillDecisionEmails() {
+  const prog = dProg();
+  if (!prog) return;
+  const t = meeting.decision_emails?.[prog] || {};
+  $('d-form-prog').textContent = `(${prog})`;
+  $('d-acc-subject').value = t.accepted?.subject || '';
+  $('d-acc-body').value = t.accepted?.body || '';
+  $('d-dec-subject').value = t.declined?.subject || '';
+  $('d-dec-body').value = t.declined?.body || '';
+}
+
+async function saveDecisionEmails() {
+  const prog = dProg();
+  const emails = {
+    accepted: { subject: $('d-acc-subject').value.trim(), body: $('d-acc-body').value.trim() },
+    declined: { subject: $('d-dec-subject').value.trim(), body: $('d-dec-body').value.trim() },
+  };
+  const { error } = await sb.rpc('set_decision_emails', { m: meeting.id, prog, emails });
+  if (error) { say('dash-msg', `Wording not saved: ${error.message}`, 'bad'); return false; }
+  meeting.decision_emails = { ...meeting.decision_emails, [prog]: emails };
+  return true;
+}
+
+for (const r of document.querySelectorAll('[name=d-prog]')) r.addEventListener('change', () => { renderDecisions(); fillDecisionEmails(); });
+
+$('d-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (await saveDecisionEmails()) say('dash-msg', `Saved the ${dProg()} decision emails.`, 'ok');
+});
+
+$('d-test').addEventListener('click', async () => {
+  if (!await saveDecisionEmails()) return;
+  $('d-test').disabled = true;
+  const { error } = await sb.functions.invoke('decision-email', { body: { meeting_id: meeting.id, program: dProg(), mode: 'test' } });
+  $('d-test').disabled = false;
+  say('dash-msg', error ? `Test not sent: ${error.message}` : `Saved, and emailed you one Accept and one Decline example (subjects start with [Test]).`, error ? 'bad' : 'ok');
+});
+
+$('d-send').addEventListener('click', async () => {
+  const prog = dProg();
+  const n = subs.filter(s => s.program === prog && s.status !== 'withdrawn' && s.decision && !s.decision.sent_at).length;
+  if (!confirm(`Email ${plural(n, `${prog} decision`)} now? Each presenting author gets one, with coauthors copied, and then sees the decision on their submission page. This can't be undone.`)) return;
+  $('d-send').disabled = true;
+  say('dash-msg', 'Sending…', 'warn');
+  const { data, error } = await sb.functions.invoke('decision-email', { body: { meeting_id: meeting.id, program: prog, mode: 'send' } });
+  await load();
+  if (error) return say('dash-msg', `Sending failed: ${error.message}. Papers not sent are still waiting; you can try again.`, 'bad');
+  say('dash-msg', `Sent ${plural(data.sent, 'decision email')}.${data.failed ? ` ${data.failed} couldn't be sent and are still waiting; try again.` : ''}`, data.failed ? 'warn' : 'ok');
 });
 
 // ---------------------------------------------------------------- reviewers

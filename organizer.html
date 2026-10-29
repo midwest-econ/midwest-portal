@@ -72,6 +72,7 @@
         <button type="button" role="tab" data-tab="papers" class="on">Papers</button>
         <button type="button" role="tab" data-tab="batch">Send a batch</button>
         <button type="button" role="tab" data-tab="grid">Assign by grid</button>
+        <button type="button" role="tab" data-tab="decisions">Decisions</button>
         <button type="button" role="tab" data-tab="reviewers">Reviewers</button>
         <button type="button" role="tab" data-tab="settings">Settings</button>
       </div>
@@ -145,6 +146,41 @@
           <button type="button" class="btn ghost sm" id="g-undo" disabled>Undo changes</button>
           <span class="hint" id="g-count"></span>
         </div>
+      </div>
+    </div>
+
+    <!-- Decisions -->
+    <div id="tab-decisions" class="stack" hidden>
+      <div class="panel stack">
+        <h3>Decide</h3>
+        <p class="muted small">Papers are listed by mean score, highest first. Authors don't see a decision until the decision emails go out (below). Once a paper's email has gone out, its decision can't be changed here.</p>
+        <div class="toolbar">
+          <div class="seg" role="radiogroup" aria-label="Program">
+            <label data-prog="Trade"><input type="radio" name="d-prog" value="Trade" checked> Trade</label>
+            <label data-prog="Theory"><input type="radio" name="d-prog" value="Theory"> Theory</label>
+          </div>
+        </div>
+        <p class="waiting" id="d-summary"></p>
+        <div class="tbl-wrap"><table class="tbl" id="d-table"></table></div>
+      </div>
+
+      <form class="panel stack" id="d-form">
+        <h3>Decision emails <span class="muted small" id="d-form-prog"></span></h3>
+        <p class="muted small">The presenting author gets the email and coauthors are copied. In the wording, {name} is the presenting author, then {title}, {paper} (such as IT3), {program} (International Trade or Economic Theory), {meeting} (such as Spring 2027) and {where} (place and dates).</p>
+        <div class="field"><label for="d-acc-subject">Accept: subject</label><input id="d-acc-subject"></div>
+        <div class="field"><label for="d-acc-body">Accept: message</label><textarea id="d-acc-body" rows="10"></textarea></div>
+        <div class="field"><label for="d-dec-subject">Decline: subject</label><input id="d-dec-subject"></div>
+        <div class="field"><label for="d-dec-body">Decline: message</label><textarea id="d-dec-body" rows="10"></textarea></div>
+        <div class="btnrow">
+          <button class="btn" type="submit">Save the wording</button>
+          <button class="btn ghost sm" type="button" id="d-test">Save and email me a test of each</button>
+        </div>
+      </form>
+
+      <div class="panel stack">
+        <h3>Send the decisions</h3>
+        <p id="d-ready"></p>
+        <div class="btnrow"><button type="button" class="btn" id="d-send" disabled>Send the decision emails</button></div>
       </div>
     </div>
 
