@@ -134,6 +134,16 @@ h3 { font-size: 1.3rem; color: var(--teal); line-height: 1.3; }
 .grid-tbl td.cell.school { background: var(--warn-bg); }
 .grid-tbl td.cell.scored { font-family: var(--f-ui); font-weight: 700; color: var(--teal); }
 .grid-tbl td.cell.changed { outline: 2px solid var(--teal); outline-offset: -3px; }
+/* The grid scrolls in its own box, so the reviewer names stay at the top and (on wider
+   screens) the paper number and title stay at the left. */
+.grid-wrap { max-height: 75vh; overflow: auto; }
+.grid-tbl thead th { position: sticky; top: 0; z-index: 2; box-shadow: inset 0 -1px 0 var(--rule); }
+@media (min-width: 700px) {
+  .grid-tbl td:nth-child(-n+2) { position: sticky; z-index: 1; background: var(--paper); }
+  .grid-tbl thead th:nth-child(-n+2) { z-index: 3; }
+  .grid-tbl :is(td, th):first-child { left: 0; width: 56px; min-width: 56px; max-width: 56px; box-sizing: border-box; }
+  .grid-tbl :is(td, th):nth-child(2) { left: 56px; min-width: 220px; max-width: 300px; box-shadow: inset -1px 0 0 var(--rule); }
+}
 .pick-list { display: grid; gap: 6px; max-height: 420px; overflow-y: auto; border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; }
 details > summary { cursor: pointer; font-family: var(--f-ui); color: var(--teal); }
 .abstract, .instructions { white-space: pre-line; margin-top: 6px; }
