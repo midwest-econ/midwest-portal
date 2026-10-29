@@ -1,7 +1,7 @@
 // Review page: a committee member signs in with the email they were invited at
 // and scores each assigned paper 1–6, with an optional comment. Access rules
 // (supabase/migrations/003_review.sql) limit them to their own assignments.
-import { sb, $, show, say, esc, fmtDate, people, openPdf, setupAuth, SCALE } from './common.js';
+import { sb, $, show, say, esc, fmtDate, people, paperId, openPdf, setupAuth, SCALE } from './common.js';
 
 let assignments = [];
 
@@ -19,7 +19,7 @@ function card(a) {
   return `<article class="panel stack paper" id="a-${a.id}">
     <div class="paper-head">
       <div>
-        <div class="eyebrow">Paper #${s.paper_no} · ${esc(s.program)}</div>
+        <div class="eyebrow">Paper ${paperId(s)} · ${esc(s.program)}</div>
         <h3>${esc(s.title)}</h3>
         <p class="muted small">${esc(people(s))}</p>
       </div>
@@ -160,7 +160,7 @@ async function saveNow(id) {
   if (res.error) {
     failed.add(id);
     $(`saved-${id}`).textContent = 'Not saved yet. Trying again…';
-    say('rv-msg', `Your latest changes to paper #${a.submission.paper_no} aren't saved yet (${res.error.message}). They are kept in this browser and the page keeps retrying. Please leave it open until it says "Saved".`, 'bad');
+    say('rv-msg', `Your latest changes to paper ${paperId(a.submission)} aren't saved yet (${res.error.message}). They are kept in this browser and the page keeps retrying. Please leave it open until it says "Saved".`, 'bad');
     if (!timers.has(id)) timers.set(id, setTimeout(() => flush(id), 10000));
     return;
   }

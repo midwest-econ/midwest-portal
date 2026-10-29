@@ -1,7 +1,7 @@
 // Organizer dashboard: every submission with its reviews, sending batches of
 // papers to reviewers or assigning them in a grid, the reviewer list, and meeting settings. Only signed-in
 // organizers get data back; the access rules are in the database.
-import { sb, $, show, say, esc, fmtStamp, fmtDeadline, people, openPdf, setupAuth, STATUS } from './common.js';
+import { sb, $, show, say, esc, fmtStamp, fmtDeadline, people, paperId, openPdf, setupAuth, STATUS } from './common.js';
 
 // Each organizer works on one program (Trade or Theory), for every meeting or for one
 // meeting. The database only returns their own program's data; this page also hides
@@ -24,7 +24,7 @@ async function load() {
   const [s, r] = await Promise.all([
     sb.from('submissions')
       .select('*, assignments(id, reviewer_id, due_on, invited_at, created_at, review:reviews(score, comments, updated_at))')
-      .eq('meeting_id', meeting.id).order('paper_no'),
+      .eq('meeting_id', meeting.id).order('program', { ascending: false }).order('paper_no'),   // Trade first
     sb.from('reviewers').select('*').order('name'),
   ]);
   if (s.error || r.error) return say('dash-msg', `Couldn't load the data: ${(s.error || r.error).message}`, 'bad');
@@ -91,7 +91,7 @@ function renderPapers() {
   const split = myPrograms.length > 1 ? ` (${myPrograms.map(p => `${byProg(p)} ${p}`).join(', ')})` : '';
   $('p-summary').textContent = `${subs.length} ${myPrograms.join(' & ')} submissions${split} · ${scored} with at least one score · showing ${list.length}`;
 
-  const statusSel = s => `<select data-status="${s.id}" aria-label="Status for paper ${s.paper_no}">` +
+  const statusSel = s => `<select data-status="${s.id}" aria-label="Status for paper ${paperId(s)}">` +
     Object.entries(STATUS).map(([k, [label]]) => `<option value="${k}"${k === s.status ? ' selected' : ''}>${label}</option>`).join('') + '</select>';
   const reviewCell = s => {
     const done = reviewsOf(s), n = s.assignments.length;
@@ -102,7 +102,7 @@ function renderPapers() {
 
   $('p-table').innerHTML = `<thead><tr><th>#</th><th>Program</th><th>Paper</th><th>Submitted</th><th>PDF</th><th>Scores</th><th>Status</th></tr></thead><tbody>` +
     list.map(s => `<tr>
-      <td>${s.paper_no}</td>
+      <td>${paperId(s)}</td>
       <td>${esc(s.program)}</td>
       <td><b>${esc(s.title)}</b><div class="small muted">${esc(people(s))} · ${esc(s.presenter_affiliation)}</div></td>
       <td class="small nowrap">${fmtStamp(s.created_at)}</td>
@@ -138,7 +138,7 @@ $('p-table').addEventListener('change', async e => {
   const { error } = await sb.rpc('set_submission_status', { sid: s.id, new_status: sel.value });
   if (error) { sel.value = s.status; return say('dash-msg', `Status not changed: ${error.message}`, 'bad'); }
   s.status = sel.value;
-  say('dash-msg', `Paper #${s.paper_no} is now "${STATUS[s.status][0]}". Authors see this on their submission page.`, 'ok');
+  say('dash-msg', `Paper ${paperId(s)} is now "${STATUS[s.status][0]}". Authors see this on their submission page.`, 'ok');
 });
 
 $('p-csv').addEventListener('click', () => {
@@ -147,7 +147,7 @@ $('p-csv').addEventListener('click', () => {
     'Abstract', 'Submitted', 'Last edited', 'Status', 'Assigned', 'Scored', 'Mean score', 'Scores and comments'];
   const rows = subs.map(s => {
     const done = reviewsOf(s);
-    return [s.paper_no, s.program, s.title, s.presenter_name, s.presenter_affiliation, s.presenter_email,
+    return [paperId(s), s.program, s.title, s.presenter_name, s.presenter_affiliation, s.presenter_email,
       (s.coauthors || []).map(c => c.affiliation ? `${c.name} (${c.affiliation})` : c.name).join('; '),
       (s.coauthors || []).map(c => c.email).join('; '),
       s.abstract, s.created_at, s.updated_at, STATUS[s.status]?.[0] || s.status,
@@ -211,7 +211,7 @@ function suggest() {
   $('b-list').innerHTML = eligible.length ? `<div class="pick-list">` + eligible.map(({ s, school }) => {
     const on = !school && !s.assignments.length && picked < size && ++picked;
     return `<label class="check"><input type="checkbox" value="${s.id}"${on ? ' checked' : ''}>
-      <span>#${s.paper_no} ${esc(s.title)} <span class="muted small">· ${esc(people(s))}${s.assignments.length ? ` · ${s.assignments.length} already assigned` : ''}</span>
+      <span>${paperId(s)} ${esc(s.title)} <span class="muted small">· ${esc(people(s))}${s.assignments.length ? ` · ${s.assignments.length} already assigned` : ''}</span>
       ${school ? '<span class="pill warn">same school</span>' : ''}</span></label>`;
   }).join('') + '</div>' : `<p class="muted small">${all ? 'No papers left for this reviewer.' : 'Every paper already has a reviewer. To give one a second reviewer, tick "Also list papers that already have a reviewer".'}</p>`;
   countPicked();
@@ -264,7 +264,7 @@ function renderBatches() {
         const due = mine.map(a => a.due_on).filter(Boolean).sort()[0];
         const last = mine.map(a => a.invited_at).filter(Boolean).sort().pop();
         return `<tr><td>${esc(r.name)}<div class="small muted">${esc(r.email)}</div></td><td>${esc(r.program)}</td>
-          <td title="${esc(mine.map(a => '#' + a.s.paper_no).join(', '))}">${mine.length}</td>
+          <td title="${esc(mine.map(a => paperId(a.s)).join(', '))}">${mine.length}</td>
           <td>${done === mine.length ? `<span class="pill ok">${done}</span>` : done}</td>
           <td class="nowrap">${due ? new Date(due + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</td>
           <td class="small nowrap">${last ? fmtStamp(last) : '<span class="pill warn">not emailed</span>'}</td>
@@ -318,13 +318,13 @@ function renderGrid() {
     if (a?.review) return `<td class="cell scored" title="Scored ${a.review.score}">${a.review.score}</td>`;
     const school = sameSchool(s, r);
     return `<td class="cell${school ? ' school' : ''}${on !== !!a ? ' changed' : ''}"${school ? ' title="Same school as the reviewer"' : ''}>
-      <input type="checkbox" data-k="${k}" aria-label="Paper ${s.paper_no} to ${esc(r.name)}"${on ? ' checked' : ''}></td>`;
+      <input type="checkbox" data-k="${k}" aria-label="Paper ${paperId(s)} to ${esc(r.name)}"${on ? ' checked' : ''}></td>`;
   };
   $('g-table').innerHTML = `<thead><tr><th>#</th><th>Paper</th>` +
     revs.map(r => `<th class="rev">${esc(r.name)}${r.active ? '' : ' <span class="muted">(inactive)</span>'}
       <div class="small muted" data-colcount="${r.id}"></div>${r.active ? `<button type="button" class="linkbtn" data-col="${r.id}">All</button>` : ''}</th>`).join('') +
     `<th>Reviewers</th></tr></thead><tbody>` +
-    papers.map(s => `<tr><td>${s.paper_no}</td>
+    papers.map(s => `<tr><td>${paperId(s)}</td>
       <td><b>${esc(s.title)}</b><div class="small muted">${esc(people(s))}</div></td>
       ${revs.map(r => cell(s, r)).join('')}
       <td class="nowrap" data-rowcount="${s.id}"></td></tr>`).join('') + '</tbody>';

@@ -66,6 +66,7 @@ SQL Editor. Never edit a file that has already been run; add a new numbered one.
 | `006_batch_alerts.sql` | remembers when Trade organizers were last told another 10 papers are waiting for a reviewer |
 | `007_demo_meeting.sql` | a demo meeting for trying the portal with test papers |
 | `008_demo_reviewers.sql` | test reviewers for the demo meeting, kept apart from the real ones |
+| `009_paper_numbers_by_program.sql` | paper numbers count within each program: IT1, IT2, … (Trade) and ET1, ET2, … (Theory) |
 
 ## The demo meeting
 

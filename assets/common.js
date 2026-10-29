@@ -42,6 +42,8 @@ export const STATUS = {
   withdrawn:    ['Withdrawn', 'bad'],
 };
 
+// Paper numbers count within each program (009): IT = International Trade, ET = Economic Theory.
+export const paperId = s => (s.program === 'Theory' ? 'ET' : 'IT') + s.paper_no;
 export const people = s => [s.presenter_name, ...(s.coauthors || []).map(c => c.name)].join(', ');
 
 // Opens a private PDF through a short-lived link.
