@@ -143,6 +143,7 @@ $('p-table').addEventListener('change', async e => {
   const { error } = await sb.rpc('set_submission_status', { sid: s.id, new_status: sel.value });
   if (error) { sel.value = s.status; return say('dash-msg', `Status not changed: ${error.message}`, 'bad'); }
   s.status = sel.value;
+  renderBatchForm(); renderGrid(); renderDecisions();
   say('dash-msg', `Paper ${paperId(s)} is now "${STATUS[s.status][0]}". Authors see this on their submission page.`, 'ok');
 });
 
@@ -425,18 +426,23 @@ function renderDecisions() {
   const count = d => papers.filter(s => s.decision?.decision === d).length;
   const undecided = papers.filter(s => !s.decision).length;
   const sent = papers.filter(s => s.decision?.sent_at).length;
+  // Withdrawn papers are listed last, out of the counts and the sending.
+  const gone = subs.filter(s => s.program === prog && s.status === 'withdrawn').sort((x, y) => x.paper_no - y.paper_no);
   $('d-summary').innerHTML = papers.length
-    ? `<b>${plural(papers.length, `${prog} paper`)}</b> · ${count('accepted')} accept · ${count('declined')} decline · ${undecided} undecided · ${sent} emailed`
+    ? `<b>${plural(papers.length, `${prog} paper`)}</b> · ${count('accepted')} accept · ${count('declined')} decline · ${undecided} undecided · ${sent} emailed` +
+      (gone.length ? ` · ${gone.length} withdrawn` : '')
     : `No ${prog} papers yet.`;
 
-  const choice = s => s.decision?.sent_at
+  const choice = s => s.status === 'withdrawn'
+    ? `<span class="pill bad">Withdrawn</span>${s.decision ? ` <span class="small muted">was ${DECISION[s.decision.decision]}${s.decision.sent_at ? ', emailed' : ''}</span>` : ''}`
+    : s.decision?.sent_at
     ? `<span class="pill ${s.decision.decision === 'accepted' ? 'ok' : 'bad'}">${DECISION[s.decision.decision]}</span> <span class="small muted">emailed ${fmtStamp(s.decision.sent_at)}</span>`
     : `<select data-decide="${s.id}" aria-label="Decision for paper ${paperId(s)}">` +
       [['', '—'], ['accepted', 'Accept'], ['declined', 'Decline']]
         .map(([v, label]) => `<option value="${v}"${(s.decision?.decision || '') === v ? ' selected' : ''}>${label}</option>`).join('') + '</select>';
-  $('d-table').innerHTML = papers.length
+  $('d-table').innerHTML = papers.length + gone.length
     ? `<thead><tr><th>#</th><th>Paper</th><th>Scores</th><th>Mean</th><th>Decision</th></tr></thead><tbody>` +
-      papers.map(s => {
+      [...papers, ...gone].map(s => {
         const scores = reviewsOf(s).map(a => a.review.score), avg = meanOf(s);
         return `<tr><td>${paperId(s)}</td>
           <td><b>${esc(s.title)}</b><div class="small muted">${esc(people(s))} · ${esc(s.presenter_affiliation)}</div></td>
