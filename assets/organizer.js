@@ -23,7 +23,7 @@ const sameSchool = (s, r) => !!r.affiliation && affiliations(s).some(a => a.incl
 async function load() {
   const [s, r] = await Promise.all([
     sb.from('submissions')
-      .select('*, assignments(id, reviewer_id, due_on, invited_at, created_at, review:reviews(score, comments, updated_at))')
+      .select('*, assignments(id, reviewer_id, invited_at, created_at, review:reviews(score, comments, updated_at))')
       .eq('meeting_id', meeting.id).order('program', { ascending: false }).order('paper_no'),   // Trade first
     sb.from('reviewers').select('*').order('name'),
   ]);
@@ -235,8 +235,7 @@ $('b-send').addEventListener('click', async () => {
   if (!r || !ids.length) return;
   if (!confirm(`Assign ${ids.length} papers to ${r.name} and email them now?`)) return;
   $('b-send').disabled = true;
-  const due_on = $('b-due').value || null;
-  const { error } = await sb.from('assignments').insert(ids.map(submission_id => ({ submission_id, reviewer_id: r.id, due_on })));
+  const { error } = await sb.from('assignments').insert(ids.map(submission_id => ({ submission_id, reviewer_id: r.id })));
   if (error) { $('b-send').disabled = false; return say('dash-msg', `Nothing was assigned: ${error.message}`, 'bad'); }
   const sent = await emailReviewer(r, 'invite');
   await load();
@@ -258,15 +257,13 @@ function renderBatches() {
     return { r, mine };
   }).filter(x => x.mine.length);
   $('b-table').innerHTML = rows.length
-    ? `<thead><tr><th>Reviewer</th><th>Program</th><th>Papers</th><th>Scored</th><th>Due</th><th>Last emailed</th><th></th></tr></thead><tbody>` +
+    ? `<thead><tr><th>Reviewer</th><th>Program</th><th>Papers</th><th>Scored</th><th>Last emailed</th><th></th></tr></thead><tbody>` +
       rows.map(({ r, mine }) => {
         const done = mine.filter(a => a.review).length;
-        const due = mine.map(a => a.due_on).filter(Boolean).sort()[0];
         const last = mine.map(a => a.invited_at).filter(Boolean).sort().pop();
         return `<tr><td>${esc(r.name)}<div class="small muted">${esc(r.email)}</div></td><td>${esc(r.program)}</td>
           <td title="${esc(mine.map(a => paperId(a.s)).join(', '))}">${mine.length}</td>
           <td>${done === mine.length ? `<span class="pill ok">${done}</span>` : done}</td>
-          <td class="nowrap">${due ? new Date(due + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</td>
           <td class="small nowrap">${last ? fmtStamp(last) : '<span class="pill warn">not emailed</span>'}</td>
           <td>${done < mine.length ? `<button type="button" class="btn ghost sm" data-remind="${r.id}">Email again</button>` : ''}</td></tr>`;
       }).join('') + '</tbody>'
@@ -395,8 +392,7 @@ $('g-save').addEventListener('click', async () => {
     if (error) { $('g-save').disabled = false; return say('dash-msg', `Nothing was changed: ${error.message}`, 'bad'); }
   }
   if (adds.length) {
-    const due_on = $('g-due').value || null;
-    const { error } = await sb.from('assignments').insert(adds.map(([submission_id, reviewer_id]) => ({ submission_id, reviewer_id, due_on })));
+    const { error } = await sb.from('assignments').insert(adds.map(([submission_id, reviewer_id]) => ({ submission_id, reviewer_id })));
     if (error) { await load(); return say('dash-msg', `${drops.length ? 'Papers were taken back, but n' : 'N'}o new papers were assigned: ${error.message}`, 'bad'); }
   }
   gridAdd.clear(); gridDrop.clear();
