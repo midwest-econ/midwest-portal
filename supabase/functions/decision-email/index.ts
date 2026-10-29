@@ -1,8 +1,9 @@
 // decision-email: called from the organizer dashboard's Decisions tab.
 //   mode "test": emails the calling organizer one Accept and one Decline example, using
 //                this program's wording and its first decided papers. Nothing is marked.
-//   mode "send": emails every decided, not yet emailed, not withdrawn paper in the program
-//                at this meeting: to the presenting author, coauthors copied. Each sent paper
+//   mode "send": emails every paper in the program at this meeting with the given decision
+//                ("accepted" or "declined"; accepts usually go days before declines) that
+//                isn't emailed yet or withdrawn: to the presenting author, coauthors copied. Each sent paper
 //                gets decisions.sent_at and its status set to accepted/declined, which is
 //                when the author first sees the decision.
 // Only the program's organizers at this meeting can call it.
@@ -119,8 +120,9 @@ async function handle(req: Request) {
   const { data: auth } = await admin.auth.getUser(token);
   if (!auth?.user?.email) return reply(401, { error: 'Not signed in' });
 
-  const { meeting_id, program, mode } = await req.json().catch(() => ({}));
-  if (!['Trade', 'Theory'].includes(program) || !['test', 'send'].includes(mode)) return reply(400, { error: 'Bad request' });
+  const { meeting_id, program, mode, decision } = await req.json().catch(() => ({}));
+  if (!['Trade', 'Theory'].includes(program) || !['test', 'send'].includes(mode)
+      || (mode === 'send' && !['accepted', 'declined'].includes(decision))) return reply(400, { error: 'Bad request' });
   const { data: m } = await admin.from('meetings').select('*').eq('id', meeting_id).maybeSingle();
   if (!m) return reply(404, { error: 'No such meeting' });
   const { data: roles } = await admin.from('organizers').select('meeting_id')
@@ -149,9 +151,10 @@ async function handle(req: Request) {
     return ok ? reply(200, { sent: 2 }) : reply(502, { error: 'The email service refused the message' });
   }
 
+  const toSend = papers.filter(s => s.decision.decision === decision);
   let sent = 0, failed = 0;
-  for (let i = 0; i < papers.length; i += BATCH) {
-    const chunk = papers.slice(i, i + BATCH);
+  for (let i = 0; i < toSend.length; i += BATCH) {
+    const chunk = toSend.slice(i, i + BATCH);
     const emails = chunk.map(s => {
       const e = render(tpls[s.decision.decision], s, m);
       const cc = coauthorEmails(s);
@@ -161,10 +164,7 @@ async function handle(req: Request) {
     if (!await resendBatch(emails, key)) { failed += chunk.length; continue; }
     const ids = chunk.map(s => s.id);
     await admin.from('decisions').update({ sent_at: new Date().toISOString() }).in('submission_id', ids);
-    for (const d of ['accepted', 'declined']) {
-      const these = chunk.filter(s => s.decision.decision === d).map(s => s.id);
-      if (these.length) await admin.from('submissions').update({ status: d }).in('id', these);
-    }
+    await admin.from('submissions').update({ status: decision }).in('id', ids);
     sent += chunk.length;
   }
   return reply(failed && !sent ? 502 : 200, { sent, failed });

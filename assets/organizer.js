@@ -446,14 +446,16 @@ function renderDecisions() {
       }).join('') + '</tbody>'
     : '';
 
-  const ready = papers.filter(s => s.decision && !s.decision.sent_at);
-  const acc = ready.filter(s => s.decision.decision === 'accepted').length;
-  $('d-ready').innerHTML = ready.length
-    ? `<b>${plural(ready.length, 'decision email')}</b> ready to send (${acc} accept, ${ready.length - acc} decline).` +
+  const ready = d => papers.filter(s => s.decision?.decision === d && !s.decision.sent_at).length;
+  const [acc, dec] = [ready('accepted'), ready('declined')];
+  $('d-ready').innerHTML = acc || dec
+    ? `Ready to send: <b>${plural(acc, 'accept email')}</b>, <b>${plural(dec, 'decline email')}</b>.` +
       (undecided ? ` ${plural(undecided, 'paper')} with no decision won't be emailed.` : '')
     : sent ? 'Every decided paper has been emailed.' : 'No decisions yet.';
-  $('d-send').disabled = !ready.length;
-  $('d-send').textContent = ready.length ? `Send ${plural(ready.length, 'decision email')}` : 'Send the decision emails';
+  for (const [d, n, word] of [['accepted', acc, 'accept'], ['declined', dec, 'decline']]) {
+    $(`d-send-${d}`).disabled = !n;
+    $(`d-send-${d}`).textContent = n ? `Send ${plural(n, `${word} email`)}` : `Send the ${word} emails`;
+  }
 }
 
 $('d-table').addEventListener('change', async e => {
@@ -509,16 +511,16 @@ $('d-test').addEventListener('click', async () => {
   say('dash-msg', error ? `Test not sent: ${error.message}` : `Saved, and emailed you one Accept and one Decline example (subjects start with [Test]).`, error ? 'bad' : 'ok');
 });
 
-$('d-send').addEventListener('click', async () => {
-  const prog = dProg();
-  const n = subs.filter(s => s.program === prog && s.status !== 'withdrawn' && s.decision && !s.decision.sent_at).length;
-  if (!confirm(`Email ${plural(n, `${prog} decision`)} now? Each presenting author gets one, with coauthors copied, and then sees the decision on their submission page. This can't be undone.`)) return;
-  $('d-send').disabled = true;
+for (const b of document.querySelectorAll('[data-send]')) b.addEventListener('click', async () => {
+  const prog = dProg(), decision = b.dataset.send, word = DECISION[decision].toLowerCase();
+  const n = subs.filter(s => s.program === prog && s.status !== 'withdrawn' && s.decision?.decision === decision && !s.decision.sent_at).length;
+  if (!confirm(`Email ${plural(n, `${prog} ${word} decision`)} now? Each presenting author gets one, with coauthors copied, and then sees the decision on their submission page. This can't be undone.`)) return;
+  b.disabled = true;
   say('dash-msg', 'Sending…', 'warn');
-  const { data, error } = await sb.functions.invoke('decision-email', { body: { meeting_id: meeting.id, program: prog, mode: 'send' } });
+  const { data, error } = await sb.functions.invoke('decision-email', { body: { meeting_id: meeting.id, program: prog, mode: 'send', decision } });
   await load();
   if (error) return say('dash-msg', `Sending failed: ${error.message}. Papers not sent are still waiting; you can try again.`, 'bad');
-  say('dash-msg', `Sent ${plural(data.sent, 'decision email')}.${data.failed ? ` ${data.failed} couldn't be sent and are still waiting; try again.` : ''}`, data.failed ? 'warn' : 'ok');
+  say('dash-msg', `Sent ${plural(data.sent, `${word} email`)}.${data.failed ? ` ${data.failed} couldn't be sent and are still waiting; try again.` : ''}`, data.failed ? 'warn' : 'ok');
 });
 
 // ---------------------------------------------------------------- reviewers

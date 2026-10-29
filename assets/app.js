@@ -134,7 +134,10 @@ function fillForm() {
 
   $('submit-heading').textContent = 'Your submission';
   $('save-btn').textContent = 'Save changes';
-  const [label, kind] = STATUS[mine.status] || [mine.status, 'info'];
+  // Once submissions close, a paper without a decision yet reads "Under review" (decline
+  // emails often go out days after the accepts, so this can last a while).
+  const shown = mine.status === 'submitted' && !isOpen() ? 'under_review' : mine.status;
+  const [label, kind] = STATUS[shown] || [shown, 'info'];
   $('status-title').textContent = mine.title;
   $('status-pill').textContent = label;
   $('status-pill').className = 'pill ' + kind;

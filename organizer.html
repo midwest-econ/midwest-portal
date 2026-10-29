@@ -179,8 +179,12 @@
 
       <div class="panel stack">
         <h3>Send the decisions</h3>
+        <p class="muted small">Accept emails usually go first. Send the decline emails a few days later, once any accepted authors who can't come have withdrawn and their places are filled: until a paper's email goes out, its decision can still be changed. Authors without a decision see "Under review" after the deadline.</p>
         <p id="d-ready"></p>
-        <div class="btnrow"><button type="button" class="btn" id="d-send" disabled>Send the decision emails</button></div>
+        <div class="btnrow">
+          <button type="button" class="btn" id="d-send-accepted" data-send="accepted" disabled>Send the accept emails</button>
+          <button type="button" class="btn ghost" id="d-send-declined" data-send="declined" disabled>Send the decline emails</button>
+        </div>
       </div>
     </div>
 
