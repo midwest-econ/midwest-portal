@@ -520,7 +520,7 @@ $('d-test').addEventListener('click', async () => {
 for (const b of document.querySelectorAll('[data-send]')) b.addEventListener('click', async () => {
   const prog = dProg(), decision = b.dataset.send, word = DECISION[decision].toLowerCase();
   const n = subs.filter(s => s.program === prog && s.status !== 'withdrawn' && s.decision?.decision === decision && !s.decision.sent_at).length;
-  if (!confirm(`Email ${plural(n, `${prog} ${word} decision`)} now? Each presenting author gets one, with coauthors copied, and then sees the decision on their submission page. This can't be undone.`)) return;
+  if (!confirm(`Email ${plural(n, `${prog} ${word} decision`)} now? Each presenting author gets one (coauthors don't) and then sees the decision on their submission page. This can't be undone.`)) return;
   b.disabled = true;
   say('dash-msg', 'Sending…', 'warn');
   const { data, error } = await sb.functions.invoke('decision-email', { body: { meeting_id: meeting.id, program: prog, mode: 'send', decision } });

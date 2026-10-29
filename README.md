@@ -28,7 +28,7 @@ supabase/email-templates/  sign-in emails, pasted into Supabase → Authenticati
 supabase/functions/        Edge Functions: submission-email (author receipts, coauthor notices,
                            "10 papers waiting" alert to Trade organizers),
                            reviewer-email (batch invitations, reminders), decision-email
-                           (Accept/Decline emails, coauthors copied), signin-code
+                           (Accept/Decline emails, presenting author only), signin-code
 ```
 
 ## Security rules

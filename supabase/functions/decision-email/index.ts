@@ -3,7 +3,7 @@
 //                this program's wording and its first decided papers. Nothing is marked.
 //   mode "send": emails every paper in the program at this meeting with the given decision
 //                ("accepted" or "declined"; accepts usually go days before declines) that
-//                isn't emailed yet or withdrawn: to the presenting author, coauthors copied. Each sent paper
+//                isn't emailed yet or withdrawn: to the presenting author only. Each sent paper
 //                gets decisions.sent_at and its status set to accepted/declined, which is
 //                when the author first sees the decision.
 // Only the program's organizers at this meeting can call it.
@@ -78,10 +78,6 @@ function render(tpl: { subject: string; body: string }, s: any, m: any) {
   return { subject, text: `${text}\n\nQuestions? Reply to this email or write to ${REPLY_TO}.`, html };
 }
 
-const coauthorEmails = (s: any) => [...new Set((s.coauthors || [])
-  .map((c: any) => (c.email || '').trim().toLowerCase())
-  .filter((e: string) => e && e !== (s.presenter_email || '').toLowerCase()))] as string[];
-
 async function sha256(s: string) {
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -133,7 +129,7 @@ async function handle(req: Request) {
   if (!tpls?.accepted || !tpls?.declined) return reply(400, { error: 'This program has no decision emails yet' });
 
   const { data: rows, error } = await admin.from('submissions')
-    .select('id, paper_no, program, title, presenter_name, presenter_email, coauthors, status, decision:decisions!inner(decision, sent_at)')
+    .select('id, paper_no, program, title, presenter_name, presenter_email, status, decision:decisions!inner(decision, sent_at)')
     .eq('meeting_id', m.id).eq('program', program).neq('status', 'withdrawn')
     .is('decision.sent_at', null).order('paper_no');
   if (error) return reply(500, { error: error.message });
@@ -141,7 +137,7 @@ async function handle(req: Request) {
 
   if (mode === 'test') {
     const example = (d: string) => papers.find(s => s.decision.decision === d) || {
-      paper_no: 1, program, title: 'An Example Paper Title', presenter_name: 'Jane Author', presenter_email: '', coauthors: [],
+      paper_no: 1, program, title: 'An Example Paper Title', presenter_name: 'Jane Author', presenter_email: '',
     };
     const emails = ['accepted', 'declined'].map(d => {
       const e = render(tpls[d], example(d), m);
@@ -157,8 +153,7 @@ async function handle(req: Request) {
     const chunk = toSend.slice(i, i + BATCH);
     const emails = chunk.map(s => {
       const e = render(tpls[s.decision.decision], s, m);
-      const cc = coauthorEmails(s);
-      return { from: FROM, reply_to: REPLY_TO, to: s.presenter_email, ...(cc.length ? { cc } : {}), subject: e.subject, text: e.text, html: e.html };
+      return { from: FROM, reply_to: REPLY_TO, to: s.presenter_email, subject: e.subject, text: e.text, html: e.html };
     });
     const key = 'decisions-' + await sha256(chunk.map(s => `${s.id}:${s.decision.decision}`).join(','));
     if (!await resendBatch(emails, key)) { failed += chunk.length; continue; }
