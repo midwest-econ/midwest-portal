@@ -65,6 +65,7 @@ SQL Editor. Never edit a file that has already been run; add a new numbered one.
 | `005_decision_date.sql` | decision notification date for each meeting (Settings; shown under Key dates) |
 | `006_batch_alerts.sql` | remembers when Trade organizers were last told another 10 papers are waiting for a reviewer |
 | `007_demo_meeting.sql` | a demo meeting for trying the portal with test papers |
+| `008_demo_reviewers.sql` | test reviewers for the demo meeting, kept apart from the real ones |
 
 ## The demo meeting
 
@@ -73,8 +74,11 @@ meetings. Submit test papers at https://portal.midwesttradetheory.org/?meeting=d
 (the plain address never shows it). Organizers choose "Demo" from the Meeting menu,
 or open `organizer.html?meeting=demo`. Emails are really sent, with "[Demo]" at the
 start of the subject, so use test addresses: Gmail's `name+anything@gmail.com` reaches
-`name@gmail.com` and counts as a different author. The reviewer list is shared with
-the real meetings, so give demo papers only to test reviewers.
+`name@gmail.com` and counts as a different author. The demo has its own test
+reviewers: those added while Demo is chosen are test reviewers, never listed for
+the real meetings, and the real committee never appears in the demo. The database
+refuses to give a demo paper to a real reviewer or a real paper to a test one, and
+someone who organizes only the demo can't see the real reviewers.
 
 To let someone try the organizer page on the demo meeting only (they sign in once first):
 
@@ -88,11 +92,11 @@ Deleting the demo meeting: first delete the `demo` folder in Storage → `papers
 ```sql
 delete from public.organizers  where meeting_id = 'demo';
 delete from public.submissions where meeting_id = 'demo';   -- their assignments and reviews go too
+delete from public.reviewers   where demo;
 delete from public.meetings    where id = 'demo';
 ```
 
-and remove the test accounts in Authentication → Users and test reviewers in the
-`reviewers` table.
+and remove the test accounts in Authentication → Users.
 
 ## Adding an organizer
 

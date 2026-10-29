@@ -13,6 +13,8 @@ const lower = s => (s || '').trim().toLowerCase();
 const reviewsOf = s => s.assignments.filter(a => a.review);
 const mean = xs => xs.length ? xs.reduce((t, x) => t + x, 0) / xs.length : null;
 const reviewerById = id => reviewers.find(r => r.id === id);
+// The demo meeting has its own test reviewers (008_demo_reviewers.sql); real meetings never list them.
+const sameKind = r => !!r.demo === !!meeting.demo;
 const authorEmails = s => [s.presenter_email, ...(s.coauthors || []).map(c => c.email)].map(lower);
 const affiliations = s => [s.presenter_affiliation, ...(s.coauthors || []).map(c => c.affiliation)].map(lower).filter(Boolean);
 const sameSchool = (s, r) => !!r.affiliation && affiliations(s).some(a => a.includes(lower(r.affiliation)) || lower(r.affiliation).includes(a));
@@ -176,7 +178,7 @@ function renderBatchForm() {
     ? `<b>${n} ${prog} paper${n > 1 ? 's' : ''}</b> waiting for a reviewer.`
     : `Every ${prog} paper has a reviewer.`;
   // Reviewers with no papers yet this meeting come first: usually the next batch goes to one of them.
-  const pool = reviewers.filter(r => r.active && r.program === prog);
+  const pool = reviewers.filter(r => r.active && r.program === prog && sameKind(r));
   const option = r => {
     const { n, done } = load_(r);
     return new Option(`${r.name}${r.affiliation ? `, ${r.affiliation}` : ''}${n ? ` · ${n} papers, ${done} scored` : ''}`, r.id);
@@ -298,7 +300,7 @@ function gridData() {
     assigned,
     papers: subs.filter(s => s.program === prog && s.status !== 'withdrawn'),
     // Inactive reviewers stay listed while they hold papers, so those show.
-    revs: reviewers.filter(r => r.program === prog && (r.active || subs.some(s => s.assignments.some(a => a.reviewer_id === r.id)))),
+    revs: reviewers.filter(r => r.program === prog && sameKind(r) && (r.active || subs.some(s => s.assignments.some(a => a.reviewer_id === r.id)))),
   };
 }
 const ticked = (assigned, k) => gridAdd.has(k) || (assigned.has(k) && !gridDrop.has(k));
@@ -407,16 +409,17 @@ $('g-save').addEventListener('click', async () => {
 
 // ---------------------------------------------------------------- reviewers
 function renderReviewers() {
-  $('r-table').innerHTML = reviewers.length
+  const list = reviewers.filter(sameKind);
+  $('r-table').innerHTML = list.length
     ? `<thead><tr><th>Name</th><th>Email</th><th>Affiliation</th><th>Program</th><th>This meeting</th><th>Active</th><th></th></tr></thead><tbody>` +
-      reviewers.map(r => {
+      list.map(r => {
         const { n, done } = load_(r);
         return `<tr><td>${esc(r.name)}</td><td class="small">${esc(r.email)}</td><td class="small">${esc(r.affiliation || '')}</td><td>${esc(r.program)}</td>
           <td class="small">${n ? `${done}/${n} scored` : ''}</td>
           <td><input type="checkbox" data-active="${r.id}"${r.active ? ' checked' : ''} aria-label="${esc(r.name)} active"></td>
           <td>${n ? '' : `<button type="button" class="linkbtn" data-remove="${r.id}">Remove</button>`}</td></tr>`;
       }).join('') + '</tbody>'
-    : '<tbody><tr><td class="muted">No reviewers yet. Add the scientific committee below.</td></tr></tbody>';
+    : `<tbody><tr><td class="muted">${meeting.demo ? 'No test reviewers yet. Add some below, with test email addresses.' : 'No reviewers yet. Add the scientific committee below.'}</td></tr></tbody>`;
 }
 
 $('r-table').addEventListener('change', async e => {
@@ -463,7 +466,14 @@ $('r-add').addEventListener('click', async () => {
   if (!rows.length) return;
   const other = rows.find(r => !myPrograms.includes(r.program));
   if (other) return say('dash-msg', `${other.name} is listed for ${other.program}, which isn't your program. Each program adds its own reviewers.`, 'bad');
+  const clash = rows.find(x => reviewers.some(r => r.email === x.email && !sameKind(r)));
+  if (clash) return say('dash-msg', meeting.demo
+    ? `${clash.email} is a real reviewer. Use a test address for the demo (for example name+demo@gmail.com).`
+    : `${clash.email} is a test reviewer for the demo meeting. Real reviewers need a different address.`, 'bad');
+  for (const x of rows) x.demo = !!meeting.demo;
   const { error } = await sb.from('reviewers').upsert(rows, { onConflict: 'email' });
+  // An address already used by a reviewer this organizer can't see (a real one, for a demo-only organizer).
+  if (error?.code === '42501') return say('dash-msg', 'Not saved: one of these addresses is already a reviewer outside the demo. Use a test address.', 'bad');
   if (error) return say('dash-msg', `Not saved: ${error.message}`, 'bad');
   $('r-bulk').value = '';
   await load();

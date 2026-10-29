@@ -88,7 +88,16 @@ async function send(msg: { to: string | string[]; subject: string; html: string;
 }
 
 // ---------------------------------------------------------------- handler
-Deno.serve(async req => {
+// The author's page may go away straight after saving (signing out reloads it), which
+// can cut the function off before the last email. waitUntil lets it finish anyway.
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
+Deno.serve(req => {
+  const done = handle(req);
+  EdgeRuntime.waitUntil(done);
+  return done;
+});
+
+async function handle(req: Request) {
   const headers = cors(req);
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
   const reply = (status: number, body: object) =>
@@ -179,7 +188,7 @@ Deno.serve(async req => {
   if (first && ALERT_PROGRAMS.includes(s.program)) sent += await batchAlert(m, s.program);
 
   return reply(200, { sent });
-});
+}
 
 // ---------------------------------------------------------------- batch alert
 // Each time the number of papers with no reviewer reaches another multiple of 10
