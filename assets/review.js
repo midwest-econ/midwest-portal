@@ -84,7 +84,7 @@ function render() {
 function lede() {
   const open = assignments.filter(a => !a.review).length;
   $('rv-lede').textContent = assignments.length
-    ? `${assignments.length - open} of ${assignments.length} scored. Scores and comments save automatically as you go, and you can change them until the organizers make decisions.`
+    ? `${assignments.length - open} of ${assignments.length} scored. Scores and comments save automatically as you go, and you can come back and change them.`
     : '';
 }
 

@@ -281,7 +281,7 @@ $('b-table').addEventListener('click', async e => {
   const b = e.target.closest('[data-remind]');
   if (!b) return;
   const r = reviewerById(Number(b.dataset.remind));
-  if (!confirm(`Email ${r.name} a reminder listing the papers they haven't scored yet?`)) return;
+  if (!confirm(`Email ${r.name} a reminder of how many papers they haven't scored yet?`)) return;
   b.disabled = true;
   if (await emailReviewer(r, 'remind')) { await load(); say('dash-msg', `Reminder sent to ${r.name}.`, 'ok'); }
   else b.disabled = false;
@@ -610,6 +610,10 @@ function fillSettings() {
       .formatToParts(new Date(meeting.submission_deadline)).map(x => [x.type, x.value]));
     $('s-date').value = `${p.year}-${p.month}-${p.day}`;
     $('s-time').value = `${p.hour}:${p.minute}`;
+  } else {
+    // Clear what the last meeting left here, or Save would write it onto this one.
+    $('s-date').value = '';
+    $('s-time').value = '23:59';
   }
   $('s-decide').value = meeting.decisions_on || '';
   $('s-now').textContent = meeting.submission_deadline ? `Now: ${fmtDeadline(meeting.submission_deadline)}` : 'No deadline set.';
