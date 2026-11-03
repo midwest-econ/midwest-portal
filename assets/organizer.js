@@ -55,7 +55,8 @@ function pickMeeting(id) {
   document.querySelector(`[name=g-prog][value="${myPrograms.includes('Theory') ? 'Theory' : myPrograms[0]}"]`).checked = true;
   show('s-admin', isAdmin());
   show('help-panel', isAdmin());
-  if (isAdmin()) loadHelpLog();
+  show('org-panel', isAdmin());
+  if (isAdmin()) { loadHelpLog(); loadOrganizers(); }
   return load();
 }
 
@@ -645,6 +646,25 @@ $('s-form').addEventListener('submit', async e => {
   fillSettings();
   say('dash-msg', 'Settings saved.', 'ok');
 });
+
+// ---------------------------------------------------------------- organizers
+// Read-only list for meeting admins, one line per person (011_organizer_list.sql).
+async function loadOrganizers() {
+  const id = meeting.id;
+  const { data, error } = await sb.rpc('meeting_organizers', { m: id });
+  if (id !== meeting.id) return;   // they've already picked another meeting
+  const line = text => `<tbody><tr><td class="muted">${esc(text)}</td></tr></tbody>`;
+  if (error) { $('org-table').innerHTML = line(`Couldn't load the list: ${error.message}`); return; }
+  if (!data.length) { $('org-table').innerHTML = line('No organizers listed.'); return; }
+  const byEmail = new Map();
+  for (const o of data) {
+    if (!byEmail.has(o.email)) byEmail.set(o.email, { admin: o.meeting_admin, roles: [] });
+    byEmail.get(o.email).roles.push(`${o.program}, ${o.all_meetings ? 'all meetings' : 'this meeting only'}`);
+  }
+  $('org-table').innerHTML = '<thead><tr><th>Email</th><th>Program</th><th>Meeting admin</th></tr></thead><tbody>' +
+    [...byEmail].map(([email, p]) => `<tr><td class="small">${esc(email)}</td><td class="small">${p.roles.map(esc).join('<br>')}</td><td class="small">${p.admin ? 'Yes' : ''}</td></tr>`).join('') +
+    '</tbody>';
+}
 
 // ---------------------------------------------------------------- sign-in help
 // Meeting admins get a code for someone whose code emails aren't arriving

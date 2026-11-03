@@ -117,3 +117,6 @@ select id, 'Theory', 'spring2027' from auth.users where email = 'name@example.ed
 insert into public.organizers (user_id, program, meeting_admin)
 select id, 'Trade', true from auth.users where email = 'name@example.edu';
 ```
+
+Meeting admins can see who organizes each meeting at the bottom of the Settings tab.
+That list is read-only, so changes are still made here.
