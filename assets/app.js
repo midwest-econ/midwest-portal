@@ -1,8 +1,11 @@
-// Submit a Paper: email sign-in, then one submission per author per meeting,
-// with the PDF kept in private storage. Access rules live in the database
-// (supabase/migrations/001_submissions.sql); this page only shows and sends.
+// Submit a Paper: email sign-in, then one submission per author per meeting for one
+// conference, with the PDF kept in private storage. The conference comes from the
+// address (?program=trade or =theory; /trade and /theory send people there), so authors
+// never choose it, and an author can have one paper at each (012_one_paper_per_program.sql).
+// With no conference in the address the page asks which one. Access rules live in the
+// database (supabase/migrations/); this page only shows and sends.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { SUPABASE_URL, SUPABASE_KEY, MAX_PDF_MB, MAX_ABSTRACT_WORDS } from './config.js';
+import { SUPABASE_URL, SUPABASE_KEY, MAX_PDF_MB, MAX_ABSTRACT_WORDS, CONFERENCES } from './config.js';
 import { wireSignIn, wireSignOut } from './signin.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -17,8 +20,14 @@ const STATUS = {
   withdrawn:    ['Withdrawn', 'bad'],
 };
 
+const params = new URLSearchParams(location.search);
+const named = params.get('meeting');   // only the demo meeting is reached by name
+const PROG = Object.keys(CONFERENCES).find(p => CONFERENCES[p].path === (params.get('program') || '').toLowerCase()) || null;
+const CONF = PROG && CONFERENCES[PROG];
+const pageFor = p => `./?program=${CONFERENCES[p].path}${named ? `&meeting=${encodeURIComponent(named)}` : ''}`;
+
 let meeting = null;     // the meeting open for submissions
-let mine = null;        // this author's submission for it, if any
+let mine = null;        // this author's submission to this conference for it, if any
 let user = null;
 
 // ---------------------------------------------------------------- helpers
@@ -45,7 +54,6 @@ function isOpen() {
 // ---------------------------------------------------------------- meeting
 // The demo meeting (007_demo_meeting.sql) is only reached by name: ?meeting=demo.
 async function loadMeeting() {
-  const named = new URLSearchParams(location.search).get('meeting');
   let q = sb.from('meetings').select('*').eq('submissions_open', true);
   q = named ? q.eq('id', named) : q.eq('demo', false);
   const { data, error } = await q.order('starts_on', { ascending: true }).limit(1);
@@ -56,7 +64,7 @@ async function loadMeeting() {
 
   const days = meeting.starts_on && meeting.ends_on
     ? ` · ${fmtDate(meeting.starts_on).replace(/, \d{4}$/, '')}–${fmtDate(meeting.ends_on)}` : '';
-  $('meeting-line').textContent = `${meeting.name} meetings · ${meeting.location || meeting.host}${days}`;
+  $('meeting-line').textContent = `${CONF ? 'Submit a Paper · ' : ''}${meeting.name} · ${meeting.location || meeting.host}${days}`;
 
   const rows = [['Submission deadline',
     meeting.submission_deadline ? fmtDeadline(meeting.submission_deadline) : 'To be announced']];
@@ -122,7 +130,6 @@ function fillForm() {
   for (const k of ['title', 'presenter_name', 'presenter_affiliation', 'abstract']) {
     if (f[k]) f[k].value = mine[k] || '';
   }
-  for (const r of f.program) r.checked = r.value === mine.program;
   (mine.coauthors || []).forEach(addCoauthor);
   updateCount();
 
@@ -162,7 +169,6 @@ function lockIfClosed() {
 
 // ---------------------------------------------------------------- save
 function validate(f, pdf) {
-  if (!f.program.value) return 'Choose the Trade or Theory program.';
   for (const [k, label] of [['title', 'paper title'], ['presenter_name', 'presenting author'],
                             ['presenter_affiliation', 'affiliation'], ['abstract', 'abstract']]) {
     if (!f[k].value.trim()) return `Please fill in the ${label}.`;
@@ -200,7 +206,7 @@ $('paper-form').addEventListener('submit', async e => {
   }
 
   const row = {
-    program: f.program.value,
+    program: PROG,
     title: f.title.value.trim(),
     presenter_name: f.presenter_name.value.trim(),
     presenter_affiliation: f.presenter_affiliation.value.trim(),
@@ -218,6 +224,7 @@ $('paper-form').addEventListener('submit', async e => {
   $('save-btn').disabled = false;
   if (res.error) {
     if (newPath) await sb.storage.from('papers').remove([newPath]);
+    if (res.error.code === '23505') return say('form-msg', `You already have a paper at the ${CONF.name} for this meeting. Reload the page to see it.`, 'bad');
     return say('form-msg', `Your submission wasn't saved: ${res.error.message}`, 'bad');
   }
   if (newPath && oldPath) await sb.storage.from('papers').remove([oldPath]);
@@ -249,17 +256,37 @@ async function render(session) {
     return;
   }
   show('notice', false);
-  show('signin', !user);
-  show('submit', !!user);
-  if (!user) return;
+  show('choose', !PROG);
+  show('signin', !!PROG && !user);
+  show('submit', !!PROG && !!user);
+  if (!PROG || !user) return;
 
   const { data, error } = await sb.from('submissions')
-    .select('*').eq('meeting_id', meeting.id).eq('user_id', user.id).maybeSingle();
+    .select('*').eq('meeting_id', meeting.id).eq('user_id', user.id).eq('program', PROG).maybeSingle();
   if (error) return say('form-msg', `Couldn't load your submission: ${error.message}`, 'bad');
   mine = data;
   fillForm();
   lockIfClosed();
 }
+
+// ---------------------------------------------------------------- conference
+// Name the conference everywhere on the page, and point to the other one's page.
+function showConference() {
+  for (const p of Object.keys(CONFERENCES)) {
+    const card = $(`choose-${CONFERENCES[p].path}`);
+    card.href = pageFor(p);
+    card.querySelector('h3').textContent = CONFERENCES[p].name;
+  }
+  if (!CONF) return;
+  document.title = `Submit a Paper · ${CONF.name}`;
+  $('conf-name').textContent = CONF.name;
+  const o = Object.keys(CONFERENCES).find(p => p !== PROG), other = CONFERENCES[o];
+  const a = document.createElement('a');
+  a.href = pageFor(o); a.textContent = other.name;
+  $('other-conf').replaceChildren(`This page is for the ${CONF.name}. For a paper in ${other.field}, use the `, a,
+    ' page instead. You can present one paper at each conference.');
+}
+showConference();
 
 try {
   await loadMeeting();

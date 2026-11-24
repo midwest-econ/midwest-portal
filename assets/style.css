@@ -62,6 +62,11 @@ h3 { font-size: 1.3rem; color: var(--teal); line-height: 1.3; }
 .panel { border: 1px solid var(--rule); border-radius: 4px; padding: 20px 22px; background: var(--paper); }
 .panel.tint { background: var(--teal-tint); border-color: var(--teal-line); }
 .narrow { max-width: 520px; }
+/* Submit page with no conference in the address: one card per conference */
+.choose-cards { max-width: 760px; gap: 20px; }
+.choose-card { display: grid; gap: 10px; justify-items: start; color: inherit; text-decoration: none; }
+.choose-card:hover { border-color: var(--teal-line); background: var(--teal-tint); }
+.choose-card h3 { font-size: 1.3rem; }
 .muted { color: var(--ink-2); }
 .small { font-size: .88rem; }
 

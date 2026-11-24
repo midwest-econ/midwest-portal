@@ -23,7 +23,7 @@
     </nav>
   </div>
   <div class="wrap hero-title">
-    <h1>Submit a Paper</h1>
+    <h1 id="conf-name">Submit a Paper</h1>
     <p id="meeting-line">&nbsp;</p>
   </div>
 </header>
@@ -43,6 +43,26 @@
   <!-- Problem reaching the database, or no open meeting -->
   <div id="notice" class="msg warn narrow" hidden></div>
   <div id="demo-note" class="msg warn narrow" hidden></div>
+
+  <!-- No conference in the address: choose one (old links to the plain address land here) -->
+  <section id="choose" hidden>
+    <div class="page-head">
+      <h2>Which conference?</h2>
+      <p class="lede">The Midwest meetings are two conferences, each with its own call for papers and its own Submit a Paper page. You can submit one paper to each.</p>
+    </div>
+    <div class="grid2 choose-cards">
+      <a class="panel choose-card" id="choose-trade" href="./?program=trade">
+        <span class="eyebrow">International trade</span>
+        <h3>Midwest International Trade Conference</h3>
+        <span class="btn">Submit a trade paper</span>
+      </a>
+      <a class="panel choose-card" id="choose-theory" href="./?program=theory">
+        <span class="eyebrow">Economic theory</span>
+        <h3>Midwest Economic Theory Conference</h3>
+        <span class="btn">Submit a theory paper</span>
+      </a>
+    </div>
+  </section>
 
   <!-- Signed out: email sign-in -->
   <section id="signin" hidden>
@@ -78,19 +98,12 @@
   <section id="submit" hidden>
     <div class="page-head">
       <h2 id="submit-heading">Your submission</h2>
-      <p class="lede">Submit one paper to the Trade or Theory program. There is no registration fee and no submission fee. You can edit your submission and replace the PDF until the deadline.</p>
+      <p class="lede">Submit one paper that you will present. There is no registration fee and no submission fee. You can edit your submission and replace the PDF until the deadline.</p>
+      <p class="small muted" id="other-conf"></p>
     </div>
 
     <div class="cols">
       <form class="panel stack" id="paper-form" novalidate>
-        <div class="field">
-          <span class="lbl">Program</span>
-          <div class="seg" role="radiogroup" aria-label="Program">
-            <label><input type="radio" name="program" value="Trade" required> International Trade</label>
-            <label><input type="radio" name="program" value="Theory"> Economic Theory</label>
-          </div>
-        </div>
-
         <div class="field">
           <label for="f-title">Paper title</label>
           <input id="f-title" name="title" required maxlength="300">

@@ -14,7 +14,13 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
 const PORTAL = 'https://portal.midwesttradetheory.org/';
-const FROM = 'Midwest Trade & Theory Conference <portal@mail.midwesttradetheory.org>';
+// Each conference has its own name and Submit a Paper page (assets/config.js has the same).
+const CONF: Record<string, { name: string; path: string }> = {
+  Trade:  { name: 'Midwest International Trade Conference', path: 'trade' },
+  Theory: { name: 'Midwest Economic Theory Conference',     path: 'theory' },
+};
+const confName = (program: string) => CONF[program]?.name || 'Midwest Trade & Theory Conference';
+const fromFor = (program: string) => `${confName(program)} <portal@mail.midwesttradetheory.org>`;
 const REPLY_TO = 'mwittconference@utk.edu';
 const ORIGINS = ['https://portal.midwesttradetheory.org', 'http://localhost:8000'];
 const FRESH_MS = 5 * 60 * 1000;   // only email about saves made in the last 5 minutes
@@ -43,12 +49,12 @@ const fmtDeadline = (t: string) => new Date(t).toLocaleString('en-US',
 
 // ---------------------------------------------------------------- email layout
 // Same look as the sign-in emails in supabase/email-templates/.
-function layout(heading: string, body: string) {
+function layout(program: string, heading: string, body: string) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:24px 0;font-family:Georgia,'Times New Roman',serif;">
   <tr><td align="center">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-top:4px solid #226e93;">
       <tr><td style="padding:28px 32px 8px;">
-        <p style="margin:0;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#226e93;font-family:Arial,Helvetica,sans-serif;">Midwest Trade &amp; Theory Conference</p>
+        <p style="margin:0;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#226e93;font-family:Arial,Helvetica,sans-serif;">${esc(confName(program))}</p>
         <h1 style="margin:8px 0 0;font-size:22px;font-weight:normal;color:#1f2a33;">${heading}</h1>
       </td></tr>
       <tr><td style="padding:16px 32px;font-size:16px;line-height:1.5;color:#1f2a33;">${body}</td></tr>
@@ -72,7 +78,7 @@ function summary(rows: [string, string][]) {
 }
 
 // ---------------------------------------------------------------- sending
-async function send(msg: { to: string | string[]; subject: string; html: string; text: string }, key?: string) {
+async function send(program: string, msg: { to: string | string[]; subject: string; html: string; text: string }, key?: string) {
   const headers: Record<string, string> = {
     'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
     'Content-Type': 'application/json',
@@ -81,7 +87,7 @@ async function send(msg: { to: string | string[]; subject: string; html: string;
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ from: FROM, reply_to: REPLY_TO, ...msg, subject: oneLine(msg.subject) }),
+    body: JSON.stringify({ from: fromFor(program), reply_to: REPLY_TO, ...msg, subject: oneLine(msg.subject) }),
   });
   if (!res.ok) console.error('Resend', res.status, await res.text());
   return res.ok;
@@ -118,12 +124,14 @@ async function handle(req: Request) {
 
   const m = s.meeting;
   const tag = m.demo ? '[Demo] ' : '';
-  const portal = m.demo ? `${PORTAL}?meeting=${m.id}` : PORTAL;
+  // The author's own conference page (the demo meeting is reached by name).
+  const path = CONF[s.program]?.path;
+  const portal = m.demo ? `${PORTAL}?program=${path}&meeting=${m.id}` : `${PORTAL}${path}`;
   const first = s.created_at === s.updated_at;   // only inserts leave these equal
   const where = [m.location || m.host,
     m.starts_on ? `${fmtDay(m.starts_on).replace(/, \d{4}$/, '')}–${fmtDay(m.ends_on)}` : '']
     .filter(Boolean).join(', ');
-  const meetingText = `the ${m.name} meetings${where ? ` (${where})` : ''}`;
+  const meetingText = `the ${m.name} ${confName(s.program)}${where ? ` (${where})` : ''}`;
   const deadline = m.submission_deadline ? fmtDeadline(m.submission_deadline) : 'to be announced';
   const coauthors: { name: string; affiliation?: string; email: string }[] = s.coauthors || [];
   const person = (c: { name: string; affiliation?: string }) =>
@@ -133,7 +141,7 @@ async function handle(req: Request) {
 
   // 1. Receipt to the presenting author.
   const rows: [string, string][] = [   // label, plain value (escaped for the HTML copy)
-    ['Program', s.program],
+    ['Conference', confName(s.program)],
     ['Title', s.title],
     ['Presenting', presenter],
     ['Coauthors', coauthors.map(person).join('\n') || 'None'],
@@ -146,10 +154,10 @@ async function handle(req: Request) {
     : `Your submission for ${meetingText} has been updated. This is what we now have:`;
   const editNote = `You can edit your submission and replace the PDF until the deadline (${deadline}) at`;
   const coNote = coauthors.length && first ? 'We\'re letting your coauthors know they are listed on the paper.' : '';
-  if (await send({
+  if (await send(s.program, {
     to: user.email,
     subject: `${tag}${heading}: ${s.title}`,
-    html: layout(heading,
+    html: layout(s.program, heading,
       p(esc(lead)) +
       summary(rows.map(([k, v]) => [k, esc(v).replace(/\n/g, '<br>')])) +
       p(`${esc(editNote)} <a href="${portal}" style="color:#226e93;">${portal.replace(/^https:\/\/|\/$/g, '')}</a>.`, true) +
@@ -168,13 +176,13 @@ async function handle(req: Request) {
   for (const c of fresh) {
     const e = c.email.trim().toLowerCase();
     const body =
-      p(`${esc(presenter)} has submitted <b>${esc(s.title)}</b> to the ${esc(s.program)} program of ${esc(meetingText)} and listed you, ${esc(c.name)}, as a coauthor.`) +
+      p(`${esc(presenter)} has submitted <b>${esc(s.title)}</b> to ${esc(meetingText)} and listed you, ${esc(c.name)}, as a coauthor.`) +
       p(`You don't need to do anything. The presenting author submits and edits the paper. If something isn't right, please contact ${esc(s.presenter_name)} at <a href="mailto:${esc(user.email)}" style="color:#226e93;">${esc(user.email)}</a>.`, true);
-    const ok = await send({
+    const ok = await send(s.program, {
       to: c.email.trim(),
       subject: `${tag}You're listed as a coauthor: ${s.title}`,
-      html: layout('You\'re listed as a coauthor', body),
-      text: `${presenter} has submitted "${s.title}" to the ${s.program} program of ${meetingText} and listed you, ${c.name}, as a coauthor.\n\n` +
+      html: layout(s.program, 'You\'re listed as a coauthor', body),
+      text: `${presenter} has submitted "${s.title}" to ${meetingText} and listed you, ${c.name}, as a coauthor.\n\n` +
         `You don't need to do anything. The presenting author submits and edits the paper. If something isn't right, please contact ${s.presenter_name} at ${user.email}.\n\n` +
         `Questions? Reply to this email or write to ${REPLY_TO}.`,
     }, `coauthor-${s.id}-${e}`);
@@ -222,10 +230,10 @@ async function batchAlert(m: any, program: string) {
   const page = PORTAL + 'organizer.html' + (m.demo ? `?meeting=${m.id}` : '') + '#batch';
   const lead = `${waiting} ${program} papers for the ${m.name} meetings are waiting for a reviewer.`;
   const how = `Open the organizer page and choose "Send a batch": it lists the papers with no reviewer, oldest first, with the first ${BATCH} ticked. This email goes to every ${program} organizer, so someone may already be on it.`;
-  const ok = await send({
+  const ok = await send(program, {
     to: emails,
     subject: `${m.demo ? '[Demo] ' : ''}${waiting} ${program} papers are waiting for a reviewer`,
-    html: layout(`${waiting} ${esc(program)} papers are waiting`,
+    html: layout(program, `${waiting} ${esc(program)} papers are waiting`,
       p(esc(lead)) +
       p(`<a href="${page}" style="display:inline-block;background:#226e93;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:4px;font-family:Arial,Helvetica,sans-serif;font-size:15px;">Send a batch</a>`) +
       p(esc(how), true)),

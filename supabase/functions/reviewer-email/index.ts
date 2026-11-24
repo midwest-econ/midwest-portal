@@ -11,7 +11,13 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
 const REVIEW = 'https://portal.midwesttradetheory.org/review.html';
-const FROM = 'Midwest Trade & Theory Conference <portal@mail.midwesttradetheory.org>';
+// Each conference sends under its own name (assets/config.js has the same names).
+const CONF_NAME: Record<string, string> = {
+  Trade:  'Midwest International Trade Conference',
+  Theory: 'Midwest Economic Theory Conference',
+};
+const confName = (program: string) => CONF_NAME[program] || 'Midwest Trade & Theory Conference';
+const fromFor = (program: string) => `${confName(program)} <portal@mail.midwesttradetheory.org>`;
 const REPLY_TO = 'mwittconference@utk.edu';
 const ORIGINS = ['https://portal.midwesttradetheory.org', 'http://localhost:8000'];
 
@@ -33,12 +39,12 @@ const fmtDue = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-
   { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 
 // Same look as the other portal emails.
-function layout(heading: string, body: string) {
+function layout(program: string, heading: string, body: string) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:24px 0;font-family:Georgia,'Times New Roman',serif;">
   <tr><td align="center">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-top:4px solid #226e93;">
       <tr><td style="padding:28px 32px 8px;">
-        <p style="margin:0;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#226e93;font-family:Arial,Helvetica,sans-serif;">Midwest Trade &amp; Theory Conference</p>
+        <p style="margin:0;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#226e93;font-family:Arial,Helvetica,sans-serif;">${esc(confName(program))}</p>
         <h1 style="margin:8px 0 0;font-size:22px;font-weight:normal;color:#1f2a33;">${heading}</h1>
       </td></tr>
       <tr><td style="padding:16px 32px;font-size:16px;line-height:1.5;color:#1f2a33;">${body}</td></tr>
@@ -93,11 +99,11 @@ Deno.serve(async req => {
 
   const heading = mode === 'remind' ? 'A reminder about your reviews' : 'Papers to review';
   const lead = mode === 'remind'
-    ? `Dear ${first}, this is a reminder that ${n === 1 ? 'one paper is' : `${n} papers are`} still waiting for your score for the ${m.name} meetings${due ? `, due ${fmtDue(due)}` : ''}.`
-    : `Dear ${first}, thank you for reviewing for the ${m.name} meetings. We've assigned you ${papers}${due ? `, with scores due ${fmtDue(due)}` : ''}.`;
+    ? `Dear ${first}, this is a reminder that ${n === 1 ? 'one paper is' : `${n} papers are`} still waiting for your score for the ${m.name} ${confName(r.program)}${due ? `, due ${fmtDue(due)}` : ''}.`
+    : `Dear ${first}, thank you for reviewing for the ${m.name} ${confName(r.program)}. We've assigned you ${papers}${due ? `, with scores due ${fmtDue(due)}` : ''}.`;
   const how = `Open the review page and sign in with this email address (${r.email}). We'll email you a sign-in code; there is no password. Each paper's PDF, abstract and score form are on the page, and your scores save as you go.`;
 
-  const html = layout(heading,
+  const html = layout(r.program, heading,
     p(esc(lead)) +
     p(`<a href="${REVIEW}" style="display:inline-block;background:#226e93;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:4px;font-family:Arial,Helvetica,sans-serif;font-size:15px;">Open the review page</a>`) +
     p(esc(how), 'font-size:14px;color:#55626d;') +
@@ -112,7 +118,7 @@ Deno.serve(async req => {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: FROM, reply_to: REPLY_TO, to: r.email, text, html,
+      from: fromFor(r.program), reply_to: REPLY_TO, to: r.email, text, html,
       subject: (m.demo ? '[Demo] ' : '') + (mode === 'remind'
         ? `Reminder: ${n} ${r.program} paper${n > 1 ? 's' : ''} to score for the ${m.name} meetings`
         : `${papers} to review for the ${m.name} meetings`),

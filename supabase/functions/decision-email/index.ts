@@ -13,7 +13,13 @@
 //         --project-ref nvparnlljxvgapsddqzf   (the function checks the sign-in itself)
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
-const FROM = 'Midwest Trade & Theory Conference <portal@mail.midwesttradetheory.org>';
+// Each conference sends under its own name (assets/config.js has the same names).
+const CONF_NAME: Record<string, string> = {
+  Trade:  'Midwest International Trade Conference',
+  Theory: 'Midwest Economic Theory Conference',
+};
+const confName = (program: string) => CONF_NAME[program] || 'Midwest Trade & Theory Conference';
+const fromFor = (program: string) => `${confName(program)} <portal@mail.midwesttradetheory.org>`;
 const REPLY_TO = 'mwittconference@utk.edu';
 const ORIGINS = ['https://portal.midwesttradetheory.org', 'http://localhost:8000'];
 const PROGRAM_NAME: Record<string, string> = { Trade: 'International Trade', Theory: 'Economic Theory' };
@@ -38,12 +44,12 @@ const fmtDay = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-
   { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 
 // Same look as the other portal emails.
-function layout(heading: string, body: string) {
+function layout(program: string, heading: string, body: string) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:24px 0;font-family:Georgia,'Times New Roman',serif;">
   <tr><td align="center">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-top:4px solid #226e93;">
       <tr><td style="padding:28px 32px 8px;">
-        <p style="margin:0;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#226e93;font-family:Arial,Helvetica,sans-serif;">Midwest Trade &amp; Theory Conference</p>
+        <p style="margin:0;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#226e93;font-family:Arial,Helvetica,sans-serif;">${esc(confName(program))}</p>
         <h1 style="margin:8px 0 0;font-size:22px;font-weight:normal;color:#1f2a33;">${heading}</h1>
       </td></tr>
       <tr><td style="padding:16px 32px;font-size:16px;line-height:1.5;color:#1f2a33;">${body}</td></tr>
@@ -73,7 +79,7 @@ function render(tpl: { subject: string; body: string }, s: any, m: any) {
     .replace(/\{(\w+)\}/g, (all, k) => k in values ? values[k] : all);
   const subject = (m.demo ? '[Demo] ' : '') + oneLine(fill(tpl.subject));
   const text = fill(tpl.body).trim();
-  const html = layout(esc(oneLine(fill(tpl.subject))),
+  const html = layout(s.program, esc(oneLine(fill(tpl.subject))),
     text.split(/\n\s*\n/).map(par => p(esc(par.trim()).replace(/\n/g, '<br>'))).join(''));
   return { subject, text: `${text}\n\nQuestions? Reply to this email or write to ${REPLY_TO}.`, html };
 }
@@ -141,7 +147,7 @@ async function handle(req: Request) {
     };
     const emails = ['accepted', 'declined'].map(d => {
       const e = render(tpls[d], example(d), m);
-      return { from: FROM, reply_to: REPLY_TO, to: auth.user!.email, subject: `[Test] ${e.subject}`, text: e.text, html: e.html };
+      return { from: fromFor(program), reply_to: REPLY_TO, to: auth.user!.email, subject: `[Test] ${e.subject}`, text: e.text, html: e.html };
     });
     const ok = await resendBatch(emails, `decision-test-${crypto.randomUUID()}`);
     return ok ? reply(200, { sent: 2 }) : reply(502, { error: 'The email service refused the message' });
@@ -153,7 +159,7 @@ async function handle(req: Request) {
     const chunk = toSend.slice(i, i + BATCH);
     const emails = chunk.map(s => {
       const e = render(tpls[s.decision.decision], s, m);
-      return { from: FROM, reply_to: REPLY_TO, to: s.presenter_email, subject: e.subject, text: e.text, html: e.html };
+      return { from: fromFor(program), reply_to: REPLY_TO, to: s.presenter_email, subject: e.subject, text: e.text, html: e.html };
     });
     const key = 'decisions-' + await sha256(chunk.map(s => `${s.id}:${s.decision.decision}`).join(','));
     if (!await resendBatch(emails, key)) { failed += chunk.length; continue; }
