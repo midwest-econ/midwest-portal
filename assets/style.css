@@ -34,9 +34,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .hero { position: relative; color: #fff; background: #1b2a35 url("banner.jpg") center 42% / cover no-repeat; }
 .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.28) 45%, rgba(0,0,0,.55) 100%); }
 .hero > * { position: relative; }
+/* Edge to edge, like the Google Site's header */
+.hero .topnav { max-width: none; padding-inline: clamp(16px, 2.2vw, 32px); }
 .topnav { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-block: 18px; }
-.sitename { font-family: var(--f-display); font-size: 1.35rem; letter-spacing: .5px; color: #fff; text-decoration: none; }
-.navlinks { display: flex; flex-wrap: wrap; gap: 4px 22px; font-family: var(--f-display); }
+.sitename { font-family: var(--f-display); font-size: 1.4rem; letter-spacing: .5px; color: #fff; text-decoration: none; }
+.navlinks { display: flex; flex-wrap: wrap; gap: 4px 28px; font-family: var(--f-display); font-size: 1.06rem; }
 .navlinks a { color: rgba(255,255,255,.87); text-decoration: none; padding-block: 4px; border-bottom: 2px solid transparent; }
 .navlinks a.on { color: #fff; border-bottom-color: #fff; }
 .hero-title { padding-block: 56px 62px; text-align: center; }
