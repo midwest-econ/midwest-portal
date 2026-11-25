@@ -121,7 +121,7 @@ function fillForm() {
     form.reset();
     f.presenter_name.value = user.user_metadata?.full_name || '';
     $('pdf-current').hidden = true;
-    $('submit-heading').textContent = 'Submit a paper';
+    $('submit-heading').textContent = `Submit a ${CONF.path} paper`;   // "Submit a trade paper"
     $('save-btn').textContent = 'Submit paper';
     show('status-panel', false);
     updateCount();
